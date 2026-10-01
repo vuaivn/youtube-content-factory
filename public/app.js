@@ -42,9 +42,9 @@ async function pageChannels() {
     el('p', { class: 'mut' }, 'Mỗi kênh hiện MỘT lần; playlist là nhánh con. Cấu hình sản xuất nằm ở playlist.'));
   for (const c of chans) {
     const box = el('div', { class: 'card' });
-    box.append(el('div', { class: 'row' },
-      el('strong', {}, c.name),
-      el('span', { class: 'badge' }, (c.subscriber_count ?? '?') + ' subs'),
+    box.append(el('div', { class: 'row ch-row' },
+      el('strong', { class: 'ch-name' }, c.name),
+      el('span', { class: 'badge ch-subs' }, (c.subscriber_count ?? '?') + ' subs'),
       el('span', { class: 'badge ' + (c.token_status === 'valid' ? 'good' : 'bad') }, c.token_status === 'valid' ? 'đăng nhập OK' : 'HẾT HẠN đăng nhập'),
       el('button', { class: 'btn sm' + (c.token_status === 'valid' ? '' : ' danger'), onclick: () => oauthForm(c) }, '🔄 Đăng nhập lại'),
       el('button', { class: 'btn sm', onclick: () => archiveChannel(c) }, '🗄 Lưu trữ'),

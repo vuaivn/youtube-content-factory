@@ -90,3 +90,9 @@ ol.steps { margin: 8px 0 12px 18px; line-height: 1.6; }
 
 /* 30/09 lưu trữ */
 .tbl-wrap { overflow-x: auto; }
+
+/* 01/10: canh cot hang kenh */
+.ch-row { display: grid; grid-template-columns: minmax(180px, 260px) 90px 150px auto auto 1fr auto; align-items: center; gap: 10px; }
+.ch-row .ch-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ch-row .badge { justify-self: start; }
+@media (max-width: 760px) { .ch-row { grid-template-columns: 1fr auto; } .ch-row .grow { display: none; } }
