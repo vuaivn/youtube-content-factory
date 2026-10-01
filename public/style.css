@@ -1,0 +1,92 @@
+/* YouTube Content Factory — giao diện tiếng Việt, tối giản, không framework */
+* { box-sizing: border-box; margin: 0; }
+:root {
+  --bg: #12151c; --panel: #1a1f2a; --panel2: #222836; --line: #2e3648;
+  --fg: #dde3ee; --mut: #8b96ab; --acc: #4f8ef7; --good: #3fb96c; --warn: #e0a63c; --bad: #e05c5c;
+}
+body { display: flex; min-height: 100vh; background: var(--bg); color: var(--fg);
+  font: 14px/1.5 "Segoe UI", system-ui, sans-serif; }
+#nav { width: 210px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--line);
+  padding: 16px 10px; display: flex; flex-direction: column; gap: 6px; }
+#nav h1 { font-size: 17px; margin-bottom: 14px; line-height: 1.25; }
+#nav button { text-align: left; padding: 9px 12px; background: none; border: 0; border-radius: 8px;
+  color: var(--mut); font: inherit; cursor: pointer; }
+#nav button:hover { background: var(--panel2); color: var(--fg); }
+#nav button.active { background: var(--acc); color: #fff; }
+#sysinfo { margin-top: auto; font-size: 12px; color: var(--mut); border-top: 1px solid var(--line); padding-top: 10px; }
+#main { flex: 1; padding: 22px 26px; max-width: 1200px; }
+h2 { font-size: 19px; margin-bottom: 14px; }
+h3 { font-size: 15px; margin: 14px 0 8px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.grow { flex: 1; }
+.mut { color: var(--mut); font-size: 12.5px; }
+.badge { display: inline-block; padding: 1px 9px; border-radius: 20px; font-size: 12px; background: var(--panel2); }
+.badge.good { background: #1d3a29; color: var(--good); }
+.badge.warn { background: #3a2f1d; color: var(--warn); }
+.badge.bad { background: #3a1d1d; color: var(--bad); }
+button.btn { padding: 6px 14px; background: var(--panel2); color: var(--fg); border: 1px solid var(--line);
+  border-radius: 7px; font: inherit; cursor: pointer; }
+button.btn:hover { border-color: var(--acc); }
+button.btn.primary { background: var(--acc); border-color: var(--acc); color: #fff; }
+button.btn.danger { color: var(--bad); }
+button.btn.sm { padding: 3px 10px; font-size: 12.5px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+th { color: var(--mut); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+tr:hover td { background: var(--panel2); }
+td.num, th.num { text-align: right; }
+input, select, textarea { background: var(--panel2); border: 1px solid var(--line); color: var(--fg);
+  border-radius: 7px; padding: 7px 10px; font: inherit; width: 100%; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--acc); }
+label { display: block; margin: 10px 0 4px; font-size: 12.5px; color: var(--mut); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 18px; }
+.tree-pl { margin-left: 26px; padding: 8px 12px; border-left: 2px solid var(--line); display: flex;
+  align-items: center; gap: 10px; }
+.tree-pl:hover { background: var(--panel2); border-radius: 0 8px 8px 0; }
+#modal-wrap { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex;
+  align-items: flex-start; justify-content: center; padding: 40px 16px; overflow: auto; z-index: 50; }
+#modal-wrap.hidden { display: none; }
+#modal { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 20px 22px; width: min(760px, 96vw); }
+.poolbox { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+.poolbox.err { border-color: var(--bad); }
+.tabs { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
+.tabs button { padding: 7px 14px; background: none; border: 0; border-bottom: 2px solid transparent;
+  color: var(--mut); font: inherit; cursor: pointer; }
+.tabs button.active { color: var(--fg); border-bottom-color: var(--acc); }
+.toast { position: fixed; bottom: 18px; right: 18px; background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 9px; padding: 10px 16px; z-index: 99; }
+.toast.bad { border-color: var(--bad); }
+
+/* ===== B2 (30/09): form playlist ===== */
+#modal.wide { width: min(980px, 96vw); max-height: 92vh; overflow: auto; }
+.formsec { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 10px 0; }
+.formsec h4, .formsec summary { margin: 2px 0 8px; font-weight: 600; cursor: default; }
+details.formsec summary { cursor: pointer; }
+.poolgroup { margin-bottom: 10px; }
+.poolgroup-h { font-weight: 600; margin: 6px 0 4px; }
+label.ck { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; }
+label.ck input { width: auto; margin: 0; }
+.preview .tbl { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+.preview .tbl th, .preview .tbl td { border-bottom: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+.alert { border-radius: 8px; padding: 8px 12px; margin: 6px 0; }
+.alert.bad { border: 1px solid var(--bad); }
+.alert.warn { border: 1px solid #c9a227; }
+@media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+
+/* ===== B3 (30/09): chạy chuỗi + nhật ký ===== */
+.orderlist { margin-bottom: 8px; }
+.orderrow { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; }
+.progress { height: 8px; background: var(--line); border-radius: 6px; overflow: hidden; margin: 8px 0; }
+.progress span { display: block; height: 100%; background: var(--good, #3a9d5d); }
+.badge.info { border-color: #4a8fd4; color: #4a8fd4; }
+pre.logview { max-height: 70vh; overflow: auto; white-space: pre-wrap; font-size: 12px; background: rgba(0,0,0,.25); padding: 10px; border-radius: 8px; }
+
+/* ===== 30/09: đăng nhập kênh ===== */
+ol.steps { margin: 8px 0 12px 18px; line-height: 1.6; }
+#modal textarea { width: 100%; box-sizing: border-box; }
+
+/* 30/09 lưu trữ */
+.tbl-wrap { overflow-x: auto; }

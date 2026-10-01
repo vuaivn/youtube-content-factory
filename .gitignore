@@ -1,0 +1,28 @@
+﻿# Dữ liệu riêng của từng máy — KHÔNG đưa lên git
+config.json
+secrets/
+data/
+logs/
+captions/
+work/
+*.db
+*.db-wal
+*.db-shm
+*.bak*
+node_modules/
+
+# script nhập dữ liệu một lần từ app cũ trên máy us01 — không dùng ở máy khác
+server/migrate/m1-import.mjs
+server/migrate/m1b-voice-library.mjs
+server/migrate/probe-durations.mjs
+# test gắn với dữ liệu us01
+test/run-m3.mjs
+test/run-m6.mjs
+test/resume-m6.mjs
+test/verify-m1.mjs
+test/test-m5-upload.mjs
+khoi-dong-ycf.bat
+server/migrate/m2-recipe.mjs
+docs/*.pdf
+docs/*.png
+test/*.png
