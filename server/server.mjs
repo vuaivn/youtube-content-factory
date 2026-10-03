@@ -11,6 +11,8 @@ import { buildPlan } from './recipe/plan.mjs';
 import { checkResources, checkSystem } from './recipe/validate.mjs';
 import { syncPool, markMissing, probeFile, poolExts, VOICE_KINDS } from './recipe/pool-sync.mjs';
 import { migrateArchive } from './migrate/m4-archive.mjs';
+import { migrateSeo } from './migrate/m5-seo.mjs';
+import { syncTextPool } from './recipe/seo-sync.mjs';
 import { startSupervisor, createChain, getChain, listChains, pauseChain, resumeChain, cancelChain, saveSchedule } from './execute/queue.mjs';
 import { LOG_DIR, vnFromSql, vnStamp } from './execute/notify.mjs';
 import { startAuth, finishAuth, checkAllTokens } from './execute/oauth.mjs';
@@ -26,6 +28,7 @@ const TAILSCALE_IP = Object.values(os.networkInterfaces()).flat()
   .find(a => a && a.family === 'IPv4' && /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(a.address))?.address ?? null;
 openDb();
 migrateArchive(); // 30/09: cột lưu trữ kênh/playlist/kho
+migrateSeo();     // 02/10: kho SEO từ thư mục file
 
 // ---------- helpers ----------
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
@@ -322,6 +325,15 @@ route('GET', '/api/pool/:id/audit', p => { // soát kho: file mất / trùng md5
 
 // ===== Text pools: chữ thumbnail + SEO (yêu cầu #4) =====
 route('GET', '/api/channel/:id/textpool', p => all('SELECT * FROM text_pool WHERE channel_id=?', p.id));
+// 02/10: trỏ kho SEO tới thư mục file + quét
+route('PUT', '/api/textpool/:id/dir', (p, body) => {
+  const dir = String(body.root_dir ?? '').trim();
+  if (dir && !fs.existsSync(dir)) throw new Error('Thư mục không tồn tại: ' + dir);
+  run('UPDATE text_pool SET root_dir=? WHERE id=?', dir || null, p.id);
+  return dir ? syncTextPool(p.id) : { root_dir: null };
+});
+route('POST', '/api/textpool/:id/scan', p => syncTextPool(p.id));
+route('GET', '/api/textpool/:id', p => get('SELECT * FROM text_pool WHERE id=?', p.id));
 route('GET', '/api/textpool/:id/thumbnail-text', p => all(
   "SELECT * FROM thumbnail_text WHERE pool_id=? AND status='active' ORDER BY used_count, id", p.id));
 route('POST', '/api/textpool/:id/thumbnail-text', (p, body) => {
