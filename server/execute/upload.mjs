@@ -161,7 +161,10 @@ export function pickTexts(playlist, plan) {
   }
   const chapters = chaptersFromPlan(plan);
   const timeline = chapters.length ? '🕉️ CHƯƠNG MỤC / TIMELINE:\n' + chapters.map(c => `${hms(c.start)} ${c.title}`).join('\n') : '';
-  const description = d.content.includes('{TIMELINE}') ? d.content.replace('{TIMELINE}', timeline).trim() : (d.content.trim() + (timeline ? '\n\n' + timeline : ''));
+  const body = d.content.includes('{TIMELINE}') ? d.content.replace('{TIMELINE}', timeline).trim() : (d.content.trim() + (timeline ? '\n\n' + timeline : ''));
+  // 02/10: Phần kết & hashtag (ket-hashtag.txt, chung cho mọi video) LUÔN ở cuối; vượt giới hạn thì cắt phần mô tả, không cắt phần kết.
+  const ending = (pickLeastUsed(seo('ending'))?.content ?? '').trim();
+  const description = ending ? body.slice(0, 4900 - ending.length - 2).trimEnd() + '\n\n' + ending : body;
   // Dòng phụ thumbnail: kho chữ không có thì dùng tên kênh (+ số giờ với video dài) — như dòng "sub" của app cũ
   const chName = get('SELECT name FROM channel WHERE id=?', playlist.channel_id)?.name ?? '';
   const hours = Math.round((plan.total_s ?? 0) / 3600);

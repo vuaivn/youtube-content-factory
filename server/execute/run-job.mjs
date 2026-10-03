@@ -9,6 +9,7 @@ import path from 'node:path';
 import { get, all, run, openDb } from '../db/db.mjs';
 import { buildPlan } from '../recipe/plan.mjs';
 import { syncPool } from '../recipe/pool-sync.mjs';
+import { syncTextPool } from '../recipe/seo-sync.mjs';
 import { checkResources, checkSystem } from '../recipe/validate.mjs';
 import { executeJob } from './executor.mjs';
 import { verifyVideo } from './verify.mjs';
@@ -64,6 +65,11 @@ async function main() {
   for (const pp of all('SELECT pool_id FROM playlist_pool WHERE playlist_id=?', pl.id)) {
     const r = syncPool(pp.pool_id);
     log(`Kho ${pp.pool_id}: còn ${r.active} file dùng được${r.added ? ' · thêm ' + r.added : ''}${r.missing ? ' · MẤT ' + r.missing : ''}${r.restored ? ' · có lại ' + r.restored : ''}${r.warning ? ' · ⚠ ' + r.warning : ''}`);
+  }
+
+  if (pl.text_pool_id) { // 02/10: kho SEO trỏ thư mục file → đồng bộ trước khi bốc
+    try { const s = syncTextPool(pl.text_pool_id); if (!s.skipped) log(`Kho SEO ${pl.text_pool_id}: tiêu đề ${s.stat.title.active} · mô tả ${s.stat.description.active} · tag ${s.stat.tags.active} · chữ thumb ${s.stat.thumb.active} · phần kết ${s.stat.ending.active}${s.errors.length ? ' · ⚠ ' + s.errors.length + ' lỗi: ' + s.errors.slice(0, 3).join(' | ') : ''}`); }
+    catch (e) { log('⚠ Quét kho SEO lỗi: ' + e.message); }
   }
 
   // 1. Kế hoạch (y như nút Lập kế hoạch trên web)
