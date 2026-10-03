@@ -402,12 +402,31 @@ async function pageTexts() {
   const poolSel = el('select');
   const tabs = el('div', { class: 'tabs' });
   const body = el('div');
-  const KINDS = [['thumb', 'Chữ thumbnail'], ['title', 'Title'], ['description', 'Mô tả'], ['tags', 'Tag']];
+  const KINDS = [['thumb', 'Chữ thumbnail'], ['title', 'Title'], ['description', 'Mô tả'], ['ending', 'Phần kết & hashtag'], ['tags', 'Tag']];
+  const dirBox = el('div', { class: 'card' });
+  async function loadDir() {
+    const tp = await api('GET', '/api/textpool/' + poolSel.value);
+    const inp = el('input', { value: tp.root_dir ?? '', placeholder: 'vd D:\\seo-library\\seo-alta-4h  (để trống = nhập tay trên web)', style: 'flex:1;min-width:260px' });
+    const out = el('div', { class: 'mut' });
+    const show = r => {
+      if (!r || r.skipped) { out.replaceChildren(r?.reason ?? ''); return; }
+      const s = r.stat; out.replaceChildren(
+        el('div', {}, `Đang dùng: tiêu đề ${s.title.active} · mô tả ${s.description.active} · phần kết ${s.ending.active} · tag ${s.tags.active} · chữ thumbnail ${s.thumb.active}`),
+        ...r.errors.slice(0, 30).map(e => el('div', { style: 'color:var(--bad,#c33)' }, '⚠ ' + e)));
+    };
+    show(tp.last_scan ? JSON.parse(tp.last_scan) : null);
+    dirBox.replaceChildren(el('strong', {}, '📁 Thư mục SEO (chuẩn CHUAN-KHO-SEO.md)'),
+      el('div', { class: 'row', style: 'gap:8px;margin:6px 0' }, inp,
+        el('button', { class: 'btn sm primary', onclick: async () => { const r = await api('PUT', `/api/textpool/${poolSel.value}/dir`, { root_dir: inp.value }); toast('Đã lưu'); show(r); loadBody(); } }, 'Lưu'),
+        el('button', { class: 'btn sm', onclick: async () => { const r = await api('POST', `/api/textpool/${poolSel.value}/scan`); toast('Đã quét'); show(r); loadBody(); } }, 'Quét lại')),
+      el('p', { class: 'mut', style: 'margin:0' }, 'Khi đã trỏ thư mục: file là nguồn dữ liệu — sửa file rồi Quét lại (app cũng tự quét trước mỗi lần dựng). Mục thêm tay trên web sẽ bị gỡ ở lần quét sau.'),
+      out);
+  }
   let cur = 'thumb';
   async function loadPools() {
     const pools = await api('GET', `/api/channel/${chSel.value}/textpool`);
     poolSel.replaceChildren(...pools.map(p => el('option', { value: p.id }, p.id)));
-    if (pools.length) await loadBody();
+    if (pools.length) { await loadDir(); await loadBody(); }
     else body.replaceChildren(el('p', { class: 'mut' }, 'Kênh này chưa có kho chữ.'));
   }
   async function loadBody() {
@@ -460,8 +479,8 @@ async function pageTexts() {
       body.replaceChildren(add, el('div', { style: 'max-height:56vh;overflow:auto' }, tb));
     }
   }
-  chSel.onchange = loadPools; poolSel.onchange = loadBody;
-  main.append(el('div', { class: 'card row' }, el('span', {}, 'Kênh:'), chSel, el('span', {}, 'Kho:'), poolSel), tabs, body);
+  chSel.onchange = loadPools; poolSel.onchange = async () => { await loadDir(); await loadBody(); };
+  main.append(el('div', { class: 'card row' }, el('span', {}, 'Kênh:'), chSel, el('span', {}, 'Kho:'), poolSel), dirBox, tabs, body);
   await loadPools();
   return main;
 }
