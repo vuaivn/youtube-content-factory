@@ -79,7 +79,7 @@ Làm theo đúng thứ tự:
 
 1. **Kênh & Playlist → ➕ Thêm kênh mới**: đặt mã kênh (vd `alta`) → bấm *Mở trang đăng nhập Google* → chọn đúng tài khoản kênh → *Cho phép* → trang lỗi `127.0.0.1:8737` hiện ra (**bình thường**) → copy **toàn bộ địa chỉ** trên thanh URL → dán vào ô → *Lưu*. App tự lấy tên kênh, tạo kho chữ/SEO riêng cho kênh.
 2. **Kho tài nguyên → + Tạo kho**: chọn loại (hook / chuyện / outro / video shot / nhạc nền), nhập đường dẫn thư mục → *Quét lại*. Hook/chuyện/outro **thiếu `.srt` sẽ bị từ chối**.
-3. **Chữ & SEO**: chọn kênh → thêm chữ thumbnail, tiêu đề, mô tả, tag (dán nhiều dòng một lần được).
+3. **Kho chữ & SEO**: chọn kênh + kho → ô **📁 Thư mục SEO**: nhập đường dẫn thư mục SEO (chuẩn `docs/CHUAN-KHO-SEO.md`) → **Lưu** → app quét và báo số mục + lỗi từng dòng. Sửa file rồi bấm **Quét lại** (app cũng tự quét trước mỗi lần dựng). Để trống ô này thì nhập tay trên web như cũ.
 4. **Kênh & Playlist → + Thêm playlist**: ID playlist YouTube, công thức (tổng phút, số truyện, hình nền, màn đen), tick kho từng loại, chọn kho chữ/SEO → *Xem trước* → *Lưu*.
 5. **Chạy chuỗi**: tick playlist, sắp thứ tự → *Chạy ngay* hoặc *Lưu thành lịch mỗi ngày* (giờ Việt Nam).
 

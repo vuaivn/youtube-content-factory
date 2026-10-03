@@ -26,3 +26,5 @@ server/migrate/m2-recipe.mjs
 docs/*.pdf
 docs/*.png
 test/*.png
+
+test/_*
