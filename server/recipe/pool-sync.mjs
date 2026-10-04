@@ -37,6 +37,24 @@ export function markMissing(poolId) {
   return { missing, restored, active };
 }
 
+// 04/10: tiêu đề lấy từ phiếu .json cùng tên (trường tieuDe, dự phòng title) — trước đây lấy TÊN FILE
+// nên mục lục mô tả video hiện "co-giao-va-loi-khen--thien-tam". Thử: <stem>.json, rồi <stem bỏ --giọng>.json.
+// Không bao giờ đọc *.words.json. Không có phiếu → dùng tên file như cũ.
+export function readSidecar(fp) {
+  const stem = fp.replace(/\.[^.]+$/, '');
+  const cands = [stem + '.json', stem.replace(/--[^\\/]+$/, '') + '.json'];
+  for (const c of cands) {
+    if (/\.words\.json$/i.test(c) || !fs.existsSync(c)) continue;
+    try {
+      const j = JSON.parse(fs.readFileSync(c, 'utf8').replace(/^\uFEFF/, ''));
+      const t = String(j.tieuDe ?? j.title ?? '').trim();
+      return { title: t || null, json: JSON.stringify(j) };
+    } catch { /* phiếu hỏng → bỏ qua */ }
+  }
+  return { title: null, json: null };
+}
+const stemOf = fp => path.basename(fp, path.extname(fp));
+
 // Quét đầy đủ: thêm file mới + đánh dấu mất/khôi phục. Trả số liệu SAU khi đồng bộ.
 export function syncPool(poolId) {
   const pool = get('SELECT * FROM asset_pool WHERE id=?', poolId);
@@ -47,23 +65,36 @@ export function syncPool(poolId) {
   }
   const exts = poolExts(pool.kind);
   const needSub = VOICE_KINDS.includes(pool.kind);
-  let added = 0, seen = 0; const rejected = [];
+  let added = 0, seen = 0, retitled = 0; const rejected = [];
   (function walk(d) {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       const fp = path.join(d, e.name);
       if (e.isDirectory()) { if (!e.name.startsWith('_') && !['audio', 'out-final'].includes(e.name.toLowerCase())) walk(fp); continue; }
       if (!exts.includes(path.extname(e.name).toLowerCase())) continue;
       seen++;
-      if (!get('SELECT id FROM asset WHERE file_path=?', fp)) {
+      const ex = get('SELECT id, title FROM asset WHERE file_path=?', fp);
+      if (ex) {
+        // chỉ sửa tiêu đề còn đang là TÊN FILE — tiêu đề anh đã sửa tay thì giữ nguyên
+        if (ex.title === stemOf(fp)) {
+          const sc = readSidecar(fp);
+          if (sc.title && sc.title !== ex.title) {
+            run("UPDATE asset SET title=?, sidecar_json=COALESCE(sidecar_json, ?), updated_at=datetime('now') WHERE id=?", sc.title, sc.json, ex.id);
+            retitled++;
+          }
+        }
+        continue;
+      }
+      {
         const hasSub = fs.existsSync(fp.replace(/\.[^.]+$/, '.srt')) || fs.existsSync(fp.replace(/\.[^.]+$/, '.ass'));
         if (needSub && !hasSub) { rejected.push(e.name); continue; } // thiếu phụ đề → từ chối
         const pr = probeFile(fp);
         if (!pr.duration_s) { rejected.push(e.name + ' (không đọc được thời lượng — file hỏng?)'); continue; }
-        run('INSERT INTO asset (pool_id,file_path,title,has_subtitle,duration_s,md5) VALUES (?,?,?,?,?,?)',
-          poolId, fp, path.basename(e.name, path.extname(e.name)), hasSub ? 1 : 0, pr.duration_s, pr.md5);
+        const sc = readSidecar(fp);
+        run('INSERT INTO asset (pool_id,file_path,title,has_subtitle,duration_s,md5,sidecar_json) VALUES (?,?,?,?,?,?,?)',
+          poolId, fp, sc.title || stemOf(fp), hasSub ? 1 : 0, pr.duration_s, pr.md5, sc.json);
         added++;
       }
     }
   })(pool.root_dir);
-  return { seen, added, rejected, ...markMissing(poolId) };
+  return { seen, added, retitled, rejected, ...markMissing(poolId) };
 }
