@@ -18,7 +18,7 @@
 |---|---|---|
 | `ten-muc.mp3` | ✅ | Giọng đọc. Chấp nhận `.mp3` hoặc `.wav` |
 | `ten-muc.srt` | ✅ | Phụ đề khớp giọng đọc. **Thiếu `.srt` → app TỪ CHỐI, không nhập** |
-| `ten-muc.json` | nên có | Phiếu thông tin (mục 6) |
+| `ten-muc.json` | **nên có (chuyện: rất nên)** | Phiếu thông tin — **`tieuDe` là tên truyện hiện trong MỤC LỤC mô tả video** (mục 6). Thiếu phiếu → mục lục hiện tên file |
 
 **Tên file:** chữ thường, **không dấu**, nối bằng gạch ngang, không khoảng trắng, không ký tự đặc biệt.
 Ví dụ đúng: `nguoi-con-cong-cha-len-nui.mp3` + `nguoi-con-cong-cha-len-nui.srt`
@@ -65,7 +65,7 @@ Ví dụ sai: `Người con cõng cha.mp3`, `chuyen 01 (final).mp3`
 
 Lý do: app tự ghép **1 hook + nhiều chuyện ngẫu nhiên + 1 outro**, nên mỗi file phải đứng độc lập, ghép kiểu nào cũng hợp.
 
-## 6. Phiếu thông tin `.json` (nên có)
+## 6. Phiếu thông tin `.json` (nên có — chuyện thì rất nên)
 
 ```json
 {
@@ -78,6 +78,11 @@ Lý do: app tự ghép **1 hook + nhiều chuyện ngẫu nhiên + 1 outro**, n�
 }
 ```
 Lưu file `.json` dạng UTF-8.
+
+**Trường `tieuDe` quan trọng nhất:** app lấy làm tên truyện trong **mục lục thời gian ở mô tả video**. Viết tiếng Việt có dấu, đúng tên người xem sẽ đọc.
+- Thiếu phiếu (hoặc thiếu `tieuDe`) → mục lục hiện **tên file** kiểu `co-giao-va-loi-khen--thien-tam`, người xem không đọc được.
+- Tên phiếu: trùng tên file `.mp3` (`ten-muc--giong.json`), hoặc tên gốc không hậu tố giọng (`ten-muc.json`). App chấp nhận cả trường `title` thay cho `tieuDe`.
+- File `*.words.json` (mốc từng chữ) **không phải phiếu**, app bỏ qua.
 
 ## 7. Cách giao lô
 
@@ -104,4 +109,5 @@ Bên nhận dựa vào `byte` để phát hiện file tải hỏng.
 - [ ] Phụ đề khớp giọng (nghe thử đầu – giữa – cuối mỗi file)
 - [ ] Âm lượng −16 LUFS, không có nhạc nền
 - [ ] Mỗi thư mục chỉ một loại, một kênh
+- [ ] Mỗi truyện có phiếu `.json` với `tieuDe` tiếng Việt có dấu
 - [ ] Kèm `DANH-SACH.json`
