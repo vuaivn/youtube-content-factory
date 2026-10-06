@@ -11,7 +11,7 @@ import { spawnSync } from 'node:child_process';
 import { get, all, run } from '../db/db.mjs';
 
 export const VOICE_KINDS = ['hook', 'story', 'outro']; // bắt buộc có .srt đi kèm
-const POOL_EXTS = { shot: ['.mp4', '.mov', '.webm'], music: ['.mp3', '.wav', '.flac', '.m4a'], voice: ['.mp3', '.wav'] };
+const POOL_EXTS = { shot: ['.mp4', '.mov', '.webm'], music: ['.mp3', '.wav', '.flac', '.m4a', '.aac'], voice: ['.mp3', '.wav'] };
 export const poolExts = kind => POOL_EXTS[kind] ?? POOL_EXTS.voice;
 
 // Đo thời lượng (ffprobe) + md5 cho file MỚI nhập — plan.mjs cần duration_s > 0 mới chọn được.

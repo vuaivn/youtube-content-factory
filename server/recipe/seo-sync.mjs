@@ -80,6 +80,10 @@ export function readSeoDir(dir) {
     else if (x.length > LIMITS.tag) errors.push(`tag.csv dòng ${line}: tag quá dài — bỏ qua`);
     else if (!items.tags.includes(x)) items.tags.push(x);
   }
+  // 06/10: cảnh báo sớm — đếm như YouTube (tag có dấu cách +2 ngoặc kép, +1 dấu phẩy)
+  const effLen = items.tags.reduce((s, x, i) => s + (/\s/.test(x) ? x.length + 2 : x.length) + (i ? 1 : 0), 0);
+  if (effLen > 500) errors.push(`tag.csv: tổng ${effLen} ký tự (YouTube tính cả ngoặc kép) > 500 — khi upload chỉ lấy các tag đầu tới ~490`);
+  for (const x of items.tags) if (/[<>]/.test(x)) errors.push(`tag.csv: tag "${x}" chứa < hoặc > (YouTube cấm) — sẽ bị bỏ`);
   for (const { line, v: [a, b, c] } of readCsv(path.join(dir, 'chu-thumbnail.csv'), ['dong_1', 'dong_2', 'dong_phu'], errors, 'chu-thumbnail.csv', bad, 'thumb')) {
     if (!a) continue;
     if (a.length > LIMITS.thumb || b.length > LIMITS.thumb) errors.push(`chu-thumbnail.csv dòng ${line}: dòng chữ lớn > ${LIMITS.thumb} ký tự — bỏ qua`);
