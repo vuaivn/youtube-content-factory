@@ -159,7 +159,15 @@ async function playlistForm(chan, p) {
   f.en = sel([['1', 'Bật'], ['0', 'Tắt']], String(p?.enabled ?? 1));
   f.priv = sel([['private', 'Riêng tư'], ['unlisted', 'Không công khai'], ['public', 'Công khai']], p?.privacy ?? 'private');
   f.dedupe = sel([['playlist', 'Playlist này'], ['channel', 'Cả kênh']], p?.dedupe_scope ?? 'playlist');
-  f.tp = sel([['', '— chưa chọn —'], ...textPools.map(t => [t.id, t.name])], p?.text_pool_id ?? '');
+  f.tp = sel([['', '— chưa chọn —'], ...textPools.map(t => [t.id, t.name + (t.root_dir ? '' : ' (nhập tay)')])], p?.text_pool_id ?? '');
+  // 05/10: chỉ CHỌN kho (tạo kho ở trang Kho chữ & SEO). Cảnh báo khi kho đang dùng chung với playlist khác.
+  f.tpWarn = el('div', { style: 'color:#b8860b;font-size:13px;margin-top:4px' });
+  const tpCheck = () => {
+    const t = textPools.find(x => x.id === f.tp.value);
+    const others = (t?.used_by ?? '').split(' · ').filter(n => n && n !== p?.name);
+    f.tpWarn.textContent = others.length ? '⚠ Kho này đang dùng chung với: ' + others.join(', ') : '';
+  };
+  f.tp.addEventListener('change', tpCheck); tpCheck();
   f.capd = num(p?.caption_delay_hours ?? 6); f.thoff = num(p?.thumbnail_extract_offset_s ?? 150);
 
   const readFormula = () => ({
@@ -228,7 +236,7 @@ async function playlistForm(chan, p) {
         el('div', {}, el('label', {}, 'Tên hiển thị'), f.name),
         el('div', {}, el('label', {}, 'YouTube playlist ID'), f.yt),
         el('div', {}, el('label', {}, 'Tên playlist trên YouTube'), f.ytn),
-        el('div', {}, el('label', {}, 'Kho chữ thumbnail + SEO'), f.tp),
+        el('div', {}, el('label', {}, 'Kho chữ thumbnail + SEO'), f.tp, f.tpWarn),
         el('div', {}, el('label', {}, 'Quyền riêng tư khi upload'), f.priv),
         el('div', {}, el('label', {}, 'Giờ hẹn đăng phụ đề sau upload'), f.capd),
         el('div', {}, el('label', {}, 'Giây trích ảnh làm thumbnail'), f.thoff),
@@ -408,6 +416,10 @@ async function pageTexts() {
     const tp = await api('GET', '/api/textpool/' + poolSel.value);
     const inp = el('input', { value: tp.root_dir ?? '', placeholder: 'vd D:\\seo-library\\seo-alta-4h  (để trống = nhập tay trên web)', style: 'flex:1;min-width:260px' });
     const out = el('div', { class: 'mut' });
+    const tpi = poolList.find(x => x.id === poolSel.value);
+    const usedLine = el('div', { style: 'margin:4px 0 2px' }, tpi?.used_count
+      ? `Đang dùng cho playlist: ${tpi.used_by}` + (tpi.used_count > 1 ? ' ⚠ (dùng chung)' : '')
+      : el('span', { class: 'mut' }, 'Chưa playlist nào dùng kho này'));
     const show = r => {
       if (!r || r.skipped) { out.replaceChildren(r?.reason ?? ''); return; }
       const s = r.stat; out.replaceChildren(
@@ -415,7 +427,7 @@ async function pageTexts() {
         ...r.errors.slice(0, 30).map(e => el('div', { style: 'color:var(--bad,#c33)' }, '⚠ ' + e)));
     };
     show(tp.last_scan ? JSON.parse(tp.last_scan) : null);
-    dirBox.replaceChildren(el('strong', {}, '📁 Thư mục SEO (chuẩn CHUAN-KHO-SEO.md)'),
+    dirBox.replaceChildren(usedLine, el('strong', {}, '📁 Thư mục SEO (chuẩn CHUAN-KHO-SEO.md)'),
       el('div', { class: 'row', style: 'gap:8px;margin:6px 0' }, inp,
         el('button', { class: 'btn sm primary', onclick: async () => { const r = await api('PUT', `/api/textpool/${poolSel.value}/dir`, { root_dir: inp.value }); toast('Đã lưu'); show(r); loadBody(); } }, 'Lưu'),
         el('button', { class: 'btn sm', onclick: async () => { const r = await api('POST', `/api/textpool/${poolSel.value}/scan`); toast('Đã quét'); show(r); loadBody(); } }, 'Quét lại')),
@@ -423,9 +435,12 @@ async function pageTexts() {
       out);
   }
   let cur = 'thumb';
-  async function loadPools() {
+  let poolList = [];
+  async function loadPools(selectId) {
     const pools = await api('GET', `/api/channel/${chSel.value}/textpool`);
-    poolSel.replaceChildren(...pools.map(p => el('option', { value: p.id }, p.id)));
+    poolList = pools;
+    poolSel.replaceChildren(...pools.map(p => el('option', { value: p.id }, p.id + (p.used_by ? '  — ' + p.used_by : ''))));
+    if (selectId) poolSel.value = selectId;
     if (pools.length) { await loadDir(); await loadBody(); }
     else body.replaceChildren(el('p', { class: 'mut' }, 'Kênh này chưa có kho chữ.'));
   }
@@ -479,8 +494,23 @@ async function pageTexts() {
       body.replaceChildren(add, el('div', { style: 'max-height:56vh;overflow:auto' }, tb));
     }
   }
-  chSel.onchange = loadPools; poolSel.onchange = async () => { await loadDir(); await loadBody(); };
-  main.append(el('div', { class: 'card row' }, el('span', {}, 'Kênh:'), chSel, el('span', {}, 'Kho:'), poolSel), dirBox, tabs, body);
+  chSel.onchange = () => loadPools(); poolSel.onchange = async () => { await loadDir(); await loadBody(); };
+  // 05/10: tạo kho SEO mới
+  const newPool = () => {
+    const id = el('input', { placeholder: 'mã kho, vd alta-ngan' }), name = el('input', { placeholder: 'tên hiển thị' });
+    const dir = el('input', { placeholder: 'thư mục, vd D:\\seo-library\\seo-alta-ngan (trống = nhập tay)', style: 'min-width:280px' });
+    const box = el('div', { class: 'card' }, el('strong', {}, '+ Tạo kho SEO cho kênh ' + chSel.selectedOptions[0].text),
+      el('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap;margin-top:6px' }, id, name, dir,
+        el('button', { class: 'btn sm primary', onclick: async () => {
+          const r = await api('POST', '/api/textpool', { channel_id: chSel.value, id: id.value.trim(), name: name.value, root_dir: dir.value });
+          toast('Đã tạo kho ' + r.id); box.remove(); await loadPools(r.id);
+        } }, 'Tạo'),
+        el('button', { class: 'btn sm', onclick: () => box.remove() }, 'Huỷ')),
+      el('p', { class: 'mut', style: 'margin:4px 0 0' }, 'Tạo xong: chép file SEO vào thư mục rồi bấm Quét lại; vào form playlist chọn kho này.'));
+    main.insertBefore(box, dirBox);
+  };
+  main.append(el('div', { class: 'card row' }, el('span', {}, 'Kênh:'), chSel, el('span', {}, 'Kho:'), poolSel,
+    el('button', { class: 'btn sm', onclick: newPool }, '+ Tạo kho SEO')), dirBox, tabs, body);
   await loadPools();
   return main;
 }
