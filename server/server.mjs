@@ -218,6 +218,13 @@ route('DELETE', '/api/playlist/:id', p => {
       logConfigChange('recipe', rec.id, rec, null);
       run('DELETE FROM recipe WHERE id=?', rec.id);
     }
+    // 05/10: kho SEO tạo kèm lúc nhân bản (cùng mã playlist) — xoá theo nếu còn TRỐNG và không ai dùng
+    const tp = get('SELECT * FROM text_pool WHERE id=?', before.text_pool_id);
+    if (tp && tp.id === p.id && !get('SELECT 1 FROM playlist WHERE text_pool_id=?', tp.id)
+        && !get('SELECT 1 FROM seo_item WHERE pool_id=?', tp.id) && !get('SELECT 1 FROM thumbnail_text WHERE pool_id=?', tp.id)) {
+      run('DELETE FROM text_pool WHERE id=?', tp.id);
+      if (tp.root_dir) try { fs.rmdirSync(tp.root_dir); } catch {} // chỉ xoá thư mục RỖNG
+    }
   });
   return { deleted: true };
 });
@@ -238,7 +245,13 @@ route('POST', '/api/playlist/:id/clone', (p, body) => {
          SELECT ?,channel_id,?,NULL,0,?,recipe_override,subtitle_style,preferred_frequency,thumbnail_mode,
            thumbnail_extract_offset_s,episode_numbering,caption_delay_hours,privacy,dedupe_scope FROM playlist WHERE id=?`,
       nid, body.new_name ?? (src.name + ' (bản sao)'), newRecipe, p.id);
-    run('UPDATE playlist SET text_pool_id=(SELECT text_pool_id FROM playlist WHERE id=?) WHERE id=?', p.id, nid);
+    // 05/10: bản sao có kho SEO MỚI, TRỐNG (anh Vũ chốt) — thư mục cạnh thư mục kho gốc: seo-<mã playlist mới>
+    const srcTp = src.text_pool_id ? get('SELECT * FROM text_pool WHERE id=?', src.text_pool_id) : null;
+    if (get('SELECT 1 FROM text_pool WHERE id=?', nid)) throw new Error('Đã có kho SEO mã ' + nid + ' — đổi mã playlist');
+    const ndir = srcTp?.root_dir ? path.join(path.dirname(srcTp.root_dir), 'seo-' + nid) : null;
+    if (ndir) fs.mkdirSync(ndir, { recursive: true });
+    run('INSERT INTO text_pool (id,channel_id,name,root_dir) VALUES (?,?,?,?)', nid, src.channel_id, body.new_name ?? (src.name + ' (bản sao)'), ndir);
+    run('UPDATE playlist SET text_pool_id=? WHERE id=?', nid, nid);
     run('INSERT INTO playlist_pool (playlist_id,pool_id,weight) SELECT ?,pool_id,weight FROM playlist_pool WHERE playlist_id=?', nid, p.id);
   });
   return get('SELECT * FROM playlist WHERE id=?', nid);
@@ -324,7 +337,22 @@ route('GET', '/api/pool/:id/audit', p => { // soát kho: file mất / trùng md5
 });
 
 // ===== Text pools: chữ thumbnail + SEO (yêu cầu #4) =====
-route('GET', '/api/channel/:id/textpool', p => all('SELECT * FROM text_pool WHERE channel_id=?', p.id));
+// 05/10: mỗi playlist một kho SEO riêng — kho kèm danh sách playlist đang dùng
+route('GET', '/api/channel/:id/textpool', p => all(`SELECT tp.*,
+    (SELECT GROUP_CONCAT(pl.name, ' · ') FROM playlist pl WHERE pl.text_pool_id=tp.id AND pl.archived=0) AS used_by,
+    (SELECT COUNT(*) FROM playlist pl WHERE pl.text_pool_id=tp.id AND pl.archived=0) AS used_count
+  FROM text_pool tp WHERE tp.channel_id=? ORDER BY tp.id`, p.id));
+// 05/10: tạo kho SEO mới (trang Kho chữ & SEO). Thư mục chưa có thì tạo.
+route('POST', '/api/textpool', (p, body) => {
+  const id = String(body.id ?? '').trim(), ch = body.channel_id;
+  if (!/^[a-z0-9_][a-z0-9_-]{1,40}$/.test(id)) throw new Error('Mã kho: chữ thường, số, gạch ngang/gạch dưới (2–41 ký tự)');
+  if (!get('SELECT 1 FROM channel WHERE id=?', ch)) throw new Error('Không có kênh ' + ch);
+  if (get('SELECT 1 FROM text_pool WHERE id=?', id)) throw new Error('Đã có kho SEO mã ' + id);
+  const dir = String(body.root_dir ?? '').trim() || null;
+  if (dir) fs.mkdirSync(dir, { recursive: true });
+  run('INSERT INTO text_pool (id,channel_id,name,root_dir) VALUES (?,?,?,?)', id, ch, String(body.name ?? '').trim() || id, dir);
+  return { ...get('SELECT * FROM text_pool WHERE id=?', id), ...(dir ? { scan: syncTextPool(id) } : {}) };
+});
 // 02/10: trỏ kho SEO tới thư mục file + quét
 route('PUT', '/api/textpool/:id/dir', (p, body) => {
   const dir = String(body.root_dir ?? '').trim();
