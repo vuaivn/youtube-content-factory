@@ -77,6 +77,7 @@ export async function finishAuth({ pasted }) {
     if (ch.youtube_id && ch.youtube_id !== me.youtube_id)
       throw new Error(`Đăng nhập NHẦM kênh: vừa chọn "${me.title}", cần "${ch.name}". Không ghi gì — bấm lại và chọn đúng tài khoản.`);
     const file = ch.secrets_file || path.join(SECRETS_DIR, `yt-oauth-${ch.id}.json`).replace(/\\/g, '/');
+    fs.mkdirSync(path.dirname(file), { recursive: true }); // 06/10 US03: máy mới chưa có thư mục secrets
     if (fs.existsSync(file)) fs.copyFileSync(file, `${file}.bak-${stamp}`);
     fs.writeFileSync(file, JSON.stringify(creds, null, 2), 'utf8');
     run("UPDATE channel SET secrets_file=?, youtube_id=?, token_status='valid', token_checked_at=datetime('now'), subscriber_count=?, avatar_url=COALESCE(?,avatar_url), updated_at=datetime('now') WHERE id=?",
@@ -86,6 +87,7 @@ export async function finishAuth({ pasted }) {
   const dup = get('SELECT id FROM channel WHERE youtube_id=?', me.youtube_id);
   if (dup) throw new Error(`Kênh "${me.title}" đã có trong app (mã ${dup.id}) — dùng nút Đăng nhập lại của kênh đó`);
   const file = path.join(SECRETS_DIR, `yt-oauth-${p.newId}.json`).replace(/\\/g, '/');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
   if (fs.existsSync(file)) fs.copyFileSync(file, `${file}.bak-${stamp}`);
   fs.writeFileSync(file, JSON.stringify(creds, null, 2), 'utf8');
   run("INSERT INTO channel (id,name,youtube_id,secrets_file,token_status,token_checked_at,avatar_url,subscriber_count) VALUES (?,?,?,?,'valid',datetime('now'),?,?)",

@@ -141,6 +141,23 @@ export function chaptersFromPlan(plan) {
 }
 
 // Bốc SEO + chữ thumbnail (chưa đánh dấu đã dùng). Thiếu kho chữ → lỗi rõ ràng.
+// 06/10 (báo cáo US03): YouTube bọc tag có dấu cách trong "..." và 2 ngoặc kép TÍNH vào giới hạn 500.
+// Cũ đếm len+1, trần 480 → thực tế ~515-540 → HTTP 400 "invalid video keywords".
+export function tagCost(x, first) { return (/\s/.test(x) ? x.length + 2 : x.length) + (first ? 0 : 1); }
+export function fitTags(cands, limit = 490) {
+  const out = []; let len = 0;
+  for (const raw of cands) {
+    const x = String(raw ?? '').trim();
+    if (!x || out.includes(x) || /[<>]/.test(x)) continue;
+    const c = tagCost(x, out.length === 0);
+    if (len + c > limit) continue;      // bỏ tag này, thử tag ngắn hơn phía sau
+    out.push(x); len += c;
+  }
+  return out;
+}
+export const tagsLength = tags => tags.reduce((s, x, i) => s + tagCost(x, i === 0), 0);
+const stripAngle = s => String(s ?? '').replace(/[<>]/g, ''); // YouTube cấm < > ở tiêu đề/mô tả
+
 export function pickTexts(playlist, plan) {
   if (!playlist.text_pool_id) throw new Error(`playlist ${playlist.id} chưa chọn kho chữ/SEO`);
   const pool = playlist.text_pool_id;
@@ -148,8 +165,7 @@ export function pickTexts(playlist, plan) {
   const t = pickLeastUsed(seo('title')); if (!t) throw new Error(`kho chữ ${pool} không còn tiêu đề`);
   const d = pickLeastUsed(seo('description')); if (!d) throw new Error(`kho chữ ${pool} không có mô tả`);
   const tagRows = seo('tags');
-  let tags = [], len = 0;
-  for (const r of tagRows) { for (const x of r.content.split(',').map(s => s.trim()).filter(Boolean)) { if (len + x.length + 1 > 480 || tags.includes(x)) continue; tags.push(x); len += x.length + 1; } }
+  const tags = fitTags(tagRows.flatMap(r => r.content.split(',').map(s => s.trim()).filter(Boolean)));
   const th = pickLeastUsed(all("SELECT * FROM thumbnail_text WHERE pool_id=? AND status='active'", pool));
   if (!th) throw new Error(`kho chữ ${pool} không còn chữ thumbnail`);
   let title = t.content, episode = null;
@@ -169,7 +185,7 @@ export function pickTexts(playlist, plan) {
   const chName = get('SELECT name FROM channel WHERE id=?', playlist.channel_id)?.name ?? '';
   const hours = Math.round((plan.total_s ?? 0) / 3600);
   const sub = th.sub_line || (hours >= 2 ? `${chName} • Giấc Ngủ An Yên ${hours} Giờ` : chName);
-  return { title: title.slice(0, 100), description: description.slice(0, 4900), tags, thumb: { ...th, sub_line: sub }, ids: { title: t.id, description: d.id, thumbnail_text: th.id }, episode };
+  return { title: stripAngle(title).slice(0, 100), description: stripAngle(description).slice(0, 4900), tags, thumb: { ...th, sub_line: sub }, ids: { title: t.id, description: d.id, thumbnail_text: th.id }, episode };
 }
 export function markTextsUsed(picks) {
   run("UPDATE seo_item SET used_count=used_count+1, last_used_at=datetime('now') WHERE id IN (?,?)", picks.ids.title, picks.ids.description);
