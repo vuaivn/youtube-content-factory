@@ -169,6 +169,26 @@ async function playlistForm(chan, p) {
   };
   f.tp.addEventListener('change', tpCheck); tpCheck();
   f.capd = num(p?.caption_delay_hours ?? 6); f.thoff = num(p?.thumbnail_extract_offset_s ?? 150);
+  // 08/10: kiểu chữ thumbnail / phụ đề — chỉ CHỌN (tạo/sửa ở trang Kho kiểu chữ)
+  f.ths = el('select'); f.sbs = el('select');
+  let styleList = [];
+  const stImg = { thumb: el('img', { class: 'style-prev' }), subtitle: el('img', { class: 'style-prev' }) };
+  api('GET', '/api/style').then(r => {
+    styleList = r.styles;
+    const fill = (selEl, kind, cur, defName) => selEl.replaceChildren(el('option', { value: '' }, defName),
+      ...r.styles.filter(x => x.kind === kind).map(x => { const o = el('option', { value: x.id }, x.name); if (x.id === cur) o.selected = true; return o; }));
+    fill(f.ths, 'thumb', p?.thumb_style_id ?? '', 'Mặc định (Cổ điển — như hiện tại)');
+    fill(f.sbs, 'subtitle', p?.subtitle_style_id ?? '', 'Mặc định (như video đang ra)');
+  });
+  const stPreview = async kind => {
+    const id = (kind === 'thumb' ? f.ths : f.sbs).value;
+    const st = styleList.find(x => x.id === id);
+    if (!st && kind === 'subtitle') return toast('Kiểu mặc định là kiểu đang dùng hiện nay — chọn một kiểu khác để xem thử');
+    const params = st ? st.params : styleList.find(x => x.id === 'thumb-co-dien')?.params;
+    stImg[kind].replaceWith(stImg[kind] = el('p', { class: 'mut' }, 'Đang tạo ảnh…'));
+    try { const r = await api('POST', '/api/style/preview', { kind, params, playlist_id: p?.id }); const im = el('img', { class: 'style-prev', src: r.image }); stImg[kind].replaceWith(im); stImg[kind] = im; }
+    catch (e) { const er = el('p', { class: 'bad' }, e.message); stImg[kind].replaceWith(er); stImg[kind] = er; }
+  };
 
   const readFormula = () => ({
     total_min: f.total.value === '' ? null : +f.total.value, story_mode: f.mode.value, story_count: +f.count.value,
@@ -220,10 +240,15 @@ async function playlistForm(chan, p) {
   async function save() {
     const fields = { name: f.name.value.trim(), youtube_playlist_id: f.yt.value.trim() || null, youtube_playlist_name: f.ytn.value.trim() || null,
       enabled: +f.en.value, privacy: f.priv.value, dedupe_scope: f.dedupe.value, text_pool_id: f.tp.value || null,
-      caption_delay_hours: +f.capd.value, thumbnail_extract_offset_s: +f.thoff.value };
+      caption_delay_hours: +f.capd.value, thumbnail_extract_offset_s: +f.thoff.value,
+      thumb_style_id: f.ths.value || null, subtitle_style_id: f.sbs.value || null };
     if (!fields.name) return toast('Chưa nhập tên playlist', true);
     if (!(await preview())) return toast('Kế hoạch chưa dựng được — sửa công thức/kho trước khi lưu', true);
-    if (isNew) await api('POST', '/api/playlist', { id: f.id.value.trim(), channel_id: chan.id, ...fields, formula: readFormula(), pool_ids: readPools() });
+    if (isNew) { // tạo rồi lưu cấu hình 1 lần nữa để ghi kiểu phụ đề đã chọn
+      const nid = f.id.value.trim();
+      await api('POST', '/api/playlist', { id: nid, channel_id: chan.id, ...fields, formula: readFormula(), pool_ids: readPools() });
+      await api('PUT', `/api/playlist/${nid}/config`, { fields, formula: readFormula(), pool_ids: readPools() });
+    }
     else await api('PUT', `/api/playlist/${p.id}/config`, { fields, formula: readFormula(), pool_ids: readPools() });
     closeModal(); toast('Đã lưu (có lịch sử trong DB)'); nav('channels');
   }
@@ -237,6 +262,8 @@ async function playlistForm(chan, p) {
         el('div', {}, el('label', {}, 'YouTube playlist ID'), f.yt),
         el('div', {}, el('label', {}, 'Tên playlist trên YouTube'), f.ytn),
         el('div', {}, el('label', {}, 'Kho chữ thumbnail + SEO'), f.tp, f.tpWarn),
+        el('div', {}, el('label', {}, 'Kiểu chữ thumbnail'), el('div', { class: 'row' }, f.ths, el('button', { class: 'btn sm', onclick: () => stPreview('thumb') }, 'Xem thử')), stImg.thumb),
+        el('div', {}, el('label', {}, 'Kiểu phụ đề'), el('div', { class: 'row' }, f.sbs, el('button', { class: 'btn sm', onclick: () => stPreview('subtitle') }, 'Xem thử')), stImg.subtitle),
         el('div', {}, el('label', {}, 'Quyền riêng tư khi upload'), f.priv),
         el('div', {}, el('label', {}, 'Giờ hẹn đăng phụ đề sau upload'), f.capd),
         el('div', {}, el('label', {}, 'Giây trích ảnh làm thumbnail'), f.thoff),
@@ -268,6 +295,13 @@ async function playlistForm(chan, p) {
   $('#modal').classList.add('wide');
 }
 const inp = v => { const i = el('input'); i.value = v ?? ''; return i; };
+// 08/10 (anh Vũ chốt): MỌI lệnh xoá phải gõ đúng chữ "delete" để xác nhận
+function askDelete(what) {
+  const v = prompt(`XOÁ ${what}?\nKhông khôi phục được. Gõ chữ  delete  để xác nhận:`);
+  if (v == null) return null;
+  if (v.trim().toLowerCase() !== 'delete') { toast('Chưa xoá — phải gõ đúng chữ "delete"', true); return null; }
+  return 'delete';
+}
 const sel = (opts, cur) => el('select', {}, opts.map(([v, t]) => { const o = el('option', { value: v }, t); if (v === cur) o.selected = true; return o; }));
 
 // ================= TRANG KHO TÀI NGUYÊN =================
@@ -608,7 +642,7 @@ async function pageChain() {
     el('strong', {}, x.time_vn), el('span', { class: 'grow' }, `${x.name} — ${x.playlist_ids.map(plName).join(' → ')}`),
     el('span', { class: 'badge ' + (x.enabled ? 'good' : '') }, x.enabled ? 'Bật' : 'Tắt'),
     el('button', { class: 'btn sm', onclick: async () => { await api('PUT', '/api/schedule/' + x.id, { ...x, enabled: !x.enabled }); nav('chain'); } }, x.enabled ? 'Tắt' : 'Bật'),
-    el('button', { class: 'btn sm danger', onclick: async () => { if (confirm('Xoá lịch ' + x.time_vn + '?')) { await api('DELETE', '/api/schedule/' + x.id); nav('chain'); } } }, 'Xoá')))
+    el('button', { class: 'btn sm danger', onclick: async () => { if (askDelete('lịch ' + x.time_vn)) { await api('DELETE', '/api/schedule/' + x.id); nav('chain'); } } }, 'Xoá')))
     : [el('p', { class: 'mut' }, 'Chưa có lịch hẹn.')]);
 
   // --- các chuỗi ---
@@ -679,26 +713,111 @@ async function pageLogs() {
 async function pageArchive() {
   const r = await api('GET', '/api/archive');
   const restore = (url, msg) => async () => { await api('POST', url); toast(msg); nav('archive'); };
+  const hardDel = (url, what) => el('button', { class: 'btn sm danger', style: 'margin-left:6px', onclick: async () => {
+    const c = askDelete(what); if (!c) return;
+    try { const r = await api('POST', url, { confirm: c }); toast('Đã xoá ' + what + (r.secrets_kept_at ? ' — file đăng nhập chuyển vào secrets\\_da-xoa' : '')); nav('archive'); }
+    catch (e) { toast(e.message, true); }
+  } }, '🗑 Xoá');
   const tbl = (head, rows) => rows.length ? el('div', { class: 'tbl-wrap' }, el('table', { class: 'tbl' }, el('tr', {}, ...head.map(h => el('th', {}, h))), rows))
     : el('p', { class: 'mut' }, 'Không có mục nào.');
   const kindVN = { hook: 'Hook', story: 'Chuyện', outro: 'Outro', shot: 'Video shot', music: 'Nhạc nền' };
   return el('div', {}, el('h2', {}, '🗄 Lưu trữ'),
-    el('p', { class: 'mut' }, 'Các mục đã lưu trữ/ẩn không bị xoá — bấm Khôi phục để dùng lại. File trên ổ luôn giữ nguyên.'),
+    el('p', { class: 'mut' }, 'Khôi phục để dùng lại. 🗑 Xoá = xoá hẳn khỏi app (phải gõ "delete"); file media trên ổ luôn giữ nguyên. Xoá playlist/kênh sẽ xoá cả lịch sử đã dùng + lịch sử job của chúng.'),
     el('div', { class: 'card' }, el('h3', {}, `Kênh (${r.channels.length})`),
       tbl(['Kênh', 'Playlist đi kèm', 'Lưu trữ lúc', ''], r.channels.map(c => el('tr', {}, el('td', {}, c.name), el('td', { class: 'num' }, String(c.playlist_count)),
-        el('td', { class: 'mut' }, c.archived_at ?? ''), el('td', {}, el('button', { class: 'btn sm primary', onclick: restore(`/api/channel/${c.id}/restore`, 'Đã khôi phục kênh ' + c.name) }, '♻ Khôi phục')))))),
+        el('td', { class: 'mut' }, c.archived_at ?? ''), el('td', {}, el('button', { class: 'btn sm primary', onclick: restore(`/api/channel/${c.id}/restore`, 'Đã khôi phục kênh ' + c.name) }, '♻ Khôi phục'), hardDel(`/api/archive/channel/${c.id}/delete`, 'kênh ' + c.name + ' cùng các playlist của kênh')))))),
     el('div', { class: 'card' }, el('h3', {}, `Playlist (${r.playlists.length})`),
       tbl(['Playlist', 'Kênh', 'Lưu trữ lúc', ''], r.playlists.map(p => el('tr', {}, el('td', {}, p.name), el('td', {}, p.channel_name + (p.channel_archived ? ' (kênh đang lưu trữ)' : '')),
-        el('td', { class: 'mut' }, p.archived_at ?? ''), el('td', {}, el('button', { class: 'btn sm primary', onclick: restore(`/api/playlist/${p.id}/restore`, 'Đã khôi phục playlist ' + p.name) }, '♻ Khôi phục')))))),
+        el('td', { class: 'mut' }, p.archived_at ?? ''), el('td', {}, el('button', { class: 'btn sm primary', onclick: restore(`/api/playlist/${p.id}/restore`, 'Đã khôi phục playlist ' + p.name) }, '♻ Khôi phục'), hardDel(`/api/archive/playlist/${p.id}/delete`, 'playlist ' + p.name)))))),
     el('div', { class: 'card' }, el('h3', {}, `Kho (${r.pools.length})`),
       tbl(['Kho', 'Loại', 'Số mục', 'Thư mục', ''], r.pools.map(p => el('tr', {}, el('td', {}, p.name), el('td', {}, kindVN[p.kind] ?? p.kind), el('td', { class: 'num' }, String(p.asset_count)),
-        el('td', { class: 'mut' }, p.root_dir), el('td', {}, el('button', { class: 'btn sm primary', onclick: restore(`/api/pool/${p.id}/restore`, 'Đã khôi phục kho ' + p.name) }, '♻ Khôi phục')))))),
+        el('td', { class: 'mut' }, p.root_dir), el('td', {}, el('button', { class: 'btn sm primary', onclick: restore(`/api/pool/${p.id}/restore`, 'Đã khôi phục kho ' + p.name) }, '♻ Khôi phục'), hardDel(`/api/archive/pool/${p.id}/delete`, 'kho ' + p.name + ' (file trên ổ giữ nguyên)')))))),
     el('div', { class: 'card' }, el('h3', {}, `Mục đã ẩn trong kho (${r.assets.length})`),
       tbl(['Tên', 'Kho', 'Loại', ''], r.assets.map(a => el('tr', {}, el('td', {}, a.title ?? a.file_path), el('td', {}, a.pool_name), el('td', {}, kindVN[a.kind] ?? a.kind),
-        el('td', {}, el('button', { class: 'btn sm primary', onclick: restore(`/api/asset/${a.id}/restore`, 'Đã khôi phục ' + (a.title ?? '')) }, '♻ Khôi phục')))))));
+        el('td', {}, el('button', { class: 'btn sm primary', onclick: restore(`/api/asset/${a.id}/restore`, 'Đã khôi phục ' + (a.title ?? '')) }, '♻ Khôi phục'), hardDel(`/api/archive/asset/${a.id}/delete`, 'mục ' + (a.title ?? a.file_path) + ' (file trên ổ giữ nguyên)')))))));
 }
 
-const PAGES = { channels: pageChannels, pools: pagePools, texts: pageTexts, jobs: pageJobs, chain: pageChain, logs: pageLogs, archive: pageArchive };
+
+// ================= TRANG KHO KIỂU CHỮ (08/10) =================
+async function pageStyles() {
+  const r = await api('GET', '/api/style');
+  const O = r.options;
+  const KVN = { thumb: 'Kiểu chữ thumbnail', subtitle: 'Kiểu phụ đề' };
+  const card = kind => el('div', { class: 'card' }, el('div', { class: 'row', style: 'justify-content:space-between' }, el('h3', {}, KVN[kind]),
+      el('button', { class: 'btn sm primary', onclick: () => styleForm(kind, null, O) }, '+ Tạo kiểu')),
+    el('div', { class: 'tbl-wrap' }, el('table', { class: 'tbl' }, el('tr', {}, el('th', {}, 'Tên'), el('th', {}, 'Font'), el('th', {}, 'Đang dùng cho'), el('th', {}, '')),
+      r.styles.filter(x => x.kind === kind).map(x => el('tr', {}, el('td', {}, x.name + (x.builtin ? ' ⭐' : '')),
+        el('td', { class: 'mut' }, kind === 'thumb' ? (O.thumb_fonts.find(f => f.id === x.params.font)?.name ?? x.params.font) : x.params.font),
+        el('td', { class: 'mut' }, x.used_by ?? '—'),
+        el('td', {}, el('button', { class: 'btn sm', onclick: () => styleForm(kind, x, O) }, 'Sửa'),
+          el('button', { class: 'btn sm', style: 'margin-left:6px', onclick: () => styleForm(kind, { ...x, id: null, builtin: 0, name: x.name + ' (bản sao)' }, O) }, 'Nhân bản'),
+          el('button', { class: 'btn sm danger', style: 'margin-left:6px', onclick: async () => {
+            const c = askDelete('kiểu ' + x.name); if (!c) return;
+            try { await api('POST', `/api/style/${x.id}/delete`, { confirm: c }); toast('Đã xoá kiểu ' + x.name); nav('styles'); } catch (e) { toast(e.message, true); }
+          } }, '🗑 Xoá')))))));
+  return el('div', {}, el('h2', {}, '🎨 Kho kiểu chữ'),
+    el('p', { class: 'mut' }, 'Tạo / sửa / xoá kiểu chữ thumbnail và kiểu phụ đề. Mỗi playlist chọn kiểu trong form Sửa playlist. ⭐ = kiểu có sẵn. Font thư pháp: Dancing Script, Pacifico (chỉ cho thumbnail).'),
+    card('thumb'), card('subtitle'));
+}
+function styleForm(kind, st, O) {
+  const P = st?.params ?? (kind === 'thumb'
+    ? { font: 'times', layout: 'band', box_color: 'black', box_alpha: 0.55, colors: ['white', '#F5E5C0', '#EEDDBB'], sizes: [88, 88, 32], borders: [3, 3, 2], border_color: 'black', border_alpha: [0.7, 0.7, 0.6], shadow: 0 }
+    : { font: 'Arial', size: 18, primary: '#FFFFFF', outline_color: '#000000', outline_alpha: 0, outline: 2, box: 0, margin_v: 40, bold: 0 });
+  const toHex = c => ({ white: '#FFFFFF', black: '#000000', yellow: '#FFFF00' })[c] ?? c;
+  const color = v => el('input', { type: 'color', value: toHex(v) });
+  const n = (v, step = 1) => el('input', { type: 'number', value: v, step });
+  const name = inp(st?.name ?? '');
+  const g = {}; let rows;
+  if (kind === 'thumb') {
+    g.font = sel(O.thumb_fonts.map(f => [f.id, f.name]), P.font); g.layout = sel(Object.entries(O.layouts), P.layout);
+    g.box = color(P.box_color); g.boxA = n(P.box_alpha, 0.05); g.bc = color(P.border_color); g.shadow = el('input', { type: 'checkbox' }); g.shadow.checked = !!P.shadow;
+    g.c = P.colors.map(color); g.s = P.sizes.map(x => n(x)); g.b = P.borders.map(x => n(x)); g.ba = P.border_alpha.map(x => n(x, 0.05));
+    const ln = ['Dòng 1', 'Dòng 2', 'Dòng phụ'];
+    rows = [el('div', {}, el('label', {}, 'Font'), g.font), el('div', {}, el('label', {}, 'Bố cục'), g.layout),
+      el('div', {}, el('label', {}, 'Màu nền chữ / độ đậm (0 = không nền)'), el('div', { class: 'row' }, g.box, g.boxA)),
+      el('div', {}, el('label', {}, 'Màu viền chữ · đổ bóng'), el('div', { class: 'row' }, g.bc, el('label', { class: 'ck' }, g.shadow, ' Đổ bóng'))),
+      ...ln.map((t, i) => el('div', {}, el('label', {}, `${t}: màu · cỡ · viền · độ đậm viền`), el('div', { class: 'row' }, g.c[i], g.s[i], g.b[i], g.ba[i])))];
+  } else {
+    g.font = sel(O.sub_fonts.map(f => [f, f]), P.font); g.size = n(P.size); g.pr = color(P.primary); g.oc = color(P.outline_color);
+    g.oa = n(P.outline_alpha); g.ol = n(P.outline); g.mv = n(P.margin_v);
+    g.box = el('input', { type: 'checkbox' }); g.box.checked = !!P.box; g.bold = el('input', { type: 'checkbox' }); g.bold.checked = !!P.bold;
+    rows = [el('div', {}, el('label', {}, 'Font'), g.font), el('div', {}, el('label', {}, 'Cỡ chữ (16 ≈ cỡ đang dùng)'), g.size),
+      el('div', {}, el('label', {}, 'Màu chữ'), g.pr), el('div', {}, el('label', {}, 'Màu viền / nền hộp'), g.oc),
+      el('div', {}, el('label', {}, 'Độ dày viền (khi có hộp nền = lề hộp)'), g.ol), el('div', {}, el('label', {}, 'Độ trong suốt viền/hộp (0 đặc → 255 trong suốt)'), g.oa),
+      el('div', {}, el('label', {}, 'Khoảng cách tới đáy'), g.mv),
+      el('div', {}, el('label', { class: 'ck' }, g.box, ' Hộp nền phía sau chữ'), el('label', { class: 'ck' }, g.bold, ' Chữ đậm'))];
+  }
+  const read = () => kind === 'thumb'
+    ? { font: g.font.value, layout: g.layout.value, box_color: g.box.value, box_alpha: +g.boxA.value, colors: g.c.map(x => x.value), sizes: g.s.map(x => +x.value),
+        borders: g.b.map(x => +x.value), border_color: g.bc.value, border_alpha: g.ba.map(x => +x.value), shadow: g.shadow.checked ? 1 : 0 }
+    : { font: g.font.value, size: +g.size.value, primary: g.pr.value.toUpperCase(), outline_color: g.oc.value.toUpperCase(), outline_alpha: +g.oa.value,
+        outline: +g.ol.value, box: g.box.checked ? 1 : 0, margin_v: +g.mv.value, bold: g.bold.checked ? 1 : 0 };
+  let img = el('p', { class: 'mut' }, 'Bấm "Xem thử" để tạo ảnh từ một video shot thật.');
+  const preview = async () => {
+    const w = el('p', { class: 'mut' }, 'Đang tạo ảnh…'); img.replaceWith(w); img = w;
+    try { const r = await api('POST', '/api/style/preview', { kind, params: read() }); const im = el('img', { class: 'style-prev', src: r.image }); img.replaceWith(im); img = im; }
+    catch (e) { const er = el('p', { class: 'bad' }, e.message); img.replaceWith(er); img = er; }
+  };
+  const save = async () => {
+    if (!name.value.trim()) return toast('Chưa nhập tên kiểu', true);
+    try {
+      if (st?.id) await api('PUT', '/api/style/' + st.id, { name: name.value.trim(), params: read() });
+      else await api('POST', '/api/style', { kind, name: name.value.trim(), params: read() });
+      closeModal(); toast('Đã lưu kiểu'); nav('styles');
+    } catch (e) { toast(e.message, true); }
+  };
+  modal(el('h3', {}, (st?.id ? 'Sửa ' : 'Tạo ') + (kind === 'thumb' ? 'kiểu chữ thumbnail' : 'kiểu phụ đề')),
+    st?.builtin ? el('p', { class: 'mut' }, 'Kiểu có sẵn — sửa sẽ áp dụng cho mọi playlist đang dùng kiểu này.') : null,
+    el('div', { class: 'grid2' }, el('div', {}, el('label', {}, 'Tên kiểu'), name), ...rows),
+    el('div', { style: 'margin-top:10px' }, img),
+    el('div', { class: 'row', style: 'margin-top:14px' }, el('button', { class: 'btn', onclick: preview }, 'Xem thử'),
+      el('button', { class: 'btn primary', onclick: save }, 'Lưu'), el('button', { class: 'btn', onclick: closeModal }, 'Đóng')));
+  $('#modal').classList.add('wide');
+}
+const PAGES = { channels: pageChannels, pools: pagePools, texts: pageTexts, styles: pageStyles, jobs: pageJobs, chain: pageChain, logs: pageLogs, archive: pageArchive };
+// nút menu "Kho kiểu chữ" (chèn sau "Kho chữ & SEO", không phải sửa index.html)
+(() => { const after = document.querySelector('#nav button[data-page="texts"]'); if (after && !document.querySelector('#nav button[data-page="styles"]')) {
+  const b = document.createElement('button'); b.dataset.page = 'styles'; b.textContent = '🎨 Kho kiểu chữ'; after.after(b); } })();
 async function nav(page) {
   document.querySelectorAll('#nav button[data-page]').forEach(b => b.classList.toggle('active', b.dataset.page === page));
   $('#main').replaceChildren(el('p', { class: 'mut' }, 'Đang tải…'));

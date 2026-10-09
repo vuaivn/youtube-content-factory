@@ -96,3 +96,7 @@ ol.steps { margin: 8px 0 12px 18px; line-height: 1.6; }
 .ch-row .ch-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ch-row .badge { justify-self: start; }
 @media (max-width: 760px) { .ch-row { grid-template-columns: 1fr auto; } .ch-row .grow { display: none; } }
+
+/* 08/10: ảnh xem thử kiểu chữ */
+.style-prev { display: block; max-width: 100%; width: 480px; margin-top: 6px; border-radius: 6px; border: 1px solid var(--border, #ccc); }
+
