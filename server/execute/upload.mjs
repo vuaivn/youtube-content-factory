@@ -11,6 +11,7 @@ import { config, diskRoot } from '../config.mjs';
 import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { get, run } from '../db/db.mjs';
+import { thumbVf, CLASSIC_THUMB } from '../recipe/styles.mjs';
 
 const PUB_SCRIPTS = config.uploadScriptsDir;
 const UPLOAD_API = path.join(PUB_SCRIPTS, 'upload-api.mjs');
@@ -158,6 +159,11 @@ export function fitTags(cands, limit = 490) {
 export const tagsLength = tags => tags.reduce((s, x, i) => s + tagCost(x, i === 0), 0);
 const stripAngle = s => String(s ?? '').replace(/[<>]/g, ''); // YouTube cấm < > ở tiêu đề/mô tả
 
+// 08/10: kiểu chữ thumbnail playlist đã chọn (chưa chọn / kiểu bị xoá → Cổ điển như cũ)
+function thumbStyleOf(playlist) {
+  const st = playlist?.thumb_style_id ? get("SELECT params FROM style WHERE id=? AND kind='thumb'", playlist.thumb_style_id) : null;
+  return st ? JSON.parse(st.params) : CLASSIC_THUMB;
+}
 export function pickTexts(playlist, plan) {
   if (!playlist.text_pool_id) throw new Error(`playlist ${playlist.id} chưa chọn kho chữ/SEO`);
   const pool = playlist.text_pool_id;
@@ -185,7 +191,7 @@ export function pickTexts(playlist, plan) {
   const chName = get('SELECT name FROM channel WHERE id=?', playlist.channel_id)?.name ?? '';
   const hours = Math.round((plan.total_s ?? 0) / 3600);
   const sub = th.sub_line || (hours >= 2 ? `${chName} • Giấc Ngủ An Yên ${hours} Giờ` : chName);
-  return { title: stripAngle(title).slice(0, 100), description: stripAngle(description).slice(0, 4900), tags, thumb: { ...th, sub_line: sub }, ids: { title: t.id, description: d.id, thumbnail_text: th.id }, episode };
+  return { title: stripAngle(title).slice(0, 100), description: stripAngle(description).slice(0, 4900), tags, thumb: { ...th, sub_line: sub, style: thumbStyleOf(playlist) }, ids: { title: t.id, description: d.id, thumbnail_text: th.id }, episode };
 }
 export function markTextsUsed(picks) {
   run("UPDATE seo_item SET used_count=used_count+1, last_used_at=datetime('now') WHERE id IN (?,?)", picks.ids.title, picks.ids.description);
@@ -200,15 +206,7 @@ export function makeThumbnail({ plan, offsetS, texts, outPath, ffmpeg }) {
   const n = c.shots_base.length;
   for (let k = 0; k < 100000 && t >= (c.shots_base_durations?.[k % n] ?? Infinity); k++) { t -= c.shots_base_durations[k % n]; i = (k + 1) % n; }
   const src = c.shots_base[i];
-  const esc = s => String(s ?? '').replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, '\u2019').replace(/%/g, '\\%');
-  const font = config.thumbnailFont.replace(/\\/g, '/').replace(/^([A-Za-z]):/, '$1\\:');
-  const vf = [
-    'crop=iw-120:ih-80:0:0', 'scale=1280:720',
-    'drawbox=x=0:y=380:w=1280:h=340:color=black@0.55:t=fill',
-    `drawtext=fontfile='${font}':text='${esc(texts.line1)}':fontcolor=white:fontsize=88:x=(w-text_w)/2:y=430:borderw=3:bordercolor=black@0.7`,
-    `drawtext=fontfile='${font}':text='${esc(texts.line2)}':fontcolor=#F5E5C0:fontsize=88:x=(w-text_w)/2:y=530:borderw=3:bordercolor=black@0.7`,
-    `drawtext=fontfile='${font}':text='${esc(texts.sub_line)}':fontcolor=#EEDDBB:fontsize=32:x=(w-text_w)/2:y=650:borderw=2:bordercolor=black@0.6`,
-  ].join(',');
+  const vf = thumbVf(texts.style ?? CLASSIC_THUMB, texts); // 08/10: theo kiểu playlist chọn
   const r = spawnSync(ffmpeg, ['-y', '-v', 'error', '-ss', String(Math.max(0, t - 0.1)), '-i', src, '-frames:v', '1', '-update', '1', '-vf', vf, '-q:v', '2', outPath], { encoding: 'utf8' });
   if (r.status !== 0 || !fs.existsSync(outPath)) throw new Error('Tạo thumbnail lỗi: ' + (r.stderr || '').slice(-300));
   return { path: outPath, source: src, at_s: t };
