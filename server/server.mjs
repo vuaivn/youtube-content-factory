@@ -12,6 +12,8 @@ import { checkResources, checkSystem } from './recipe/validate.mjs';
 import { syncPool, markMissing, probeFile, poolExts, VOICE_KINDS } from './recipe/pool-sync.mjs';
 import { migrateArchive } from './migrate/m4-archive.mjs';
 import { migrateSeo } from './migrate/m5-seo.mjs';
+import { migrateStyle } from './migrate/m6-style.mjs';
+import { registerStyleRoutes, syncSubtitleStyle } from './routes-style.mjs';
 import { syncTextPool } from './recipe/seo-sync.mjs';
 import { startSupervisor, createChain, getChain, listChains, pauseChain, resumeChain, cancelChain, saveSchedule } from './execute/queue.mjs';
 import { LOG_DIR, vnFromSql, vnStamp } from './execute/notify.mjs';
@@ -28,6 +30,7 @@ const TAILSCALE_IP = Object.values(os.networkInterfaces()).flat()
   .find(a => a && a.family === 'IPv4' && /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(a.address))?.address ?? null;
 openDb();
 migrateArchive(); // 30/09: cột lưu trữ kênh/playlist/kho
+migrateStyle();   // 08/10: kiểu chữ thumbnail / phụ đề
 migrateSeo();     // 02/10: kho SEO từ thư mục file
 
 // ---------- helpers ----------
@@ -109,7 +112,7 @@ function recipeToFormula(r) {
   };
 }
 const PL_FIELDS = ['name', 'youtube_playlist_id', 'youtube_playlist_name', 'enabled', 'subtitle_style', 'preferred_frequency',
-  'thumbnail_mode', 'thumbnail_extract_offset_s', 'episode_numbering', 'caption_delay_hours', 'privacy', 'dedupe_scope', 'text_pool_id'];
+  'thumbnail_mode', 'thumbnail_extract_offset_s', 'episode_numbering', 'caption_delay_hours', 'privacy', 'dedupe_scope', 'text_pool_id', 'thumb_style_id', 'subtitle_style_id'];
 function savePools(playlistId, poolIds) {
   if (!Array.isArray(poolIds)) return;
   for (const id of poolIds) if (!get('SELECT 1 FROM asset_pool WHERE id=?', id)) throw new Error('Không có kho ' + id);
@@ -187,6 +190,7 @@ route('PUT', '/api/playlist/:id/config', (p, body) => {
     }
     if (body.formula) saveRecipe(pl.recipe_id, f.name ?? pl.name, recipeKind(body.formula), body.formula);
     savePools(p.id, body.pool_ids);
+    syncSubtitleStyle(p.id);
   });
   return get('SELECT * FROM playlist WHERE id=?', p.id);
 });
@@ -241,9 +245,9 @@ route('POST', '/api/playlist/:id/clone', (p, body) => {
          SELECT ?,?,kind,total_seconds,max_voice_ratio,body_spec,tail_spec,on_body_overflow,fade_out_of_body_s,
           silence_gap_s,fade_into_tail_s,fade_end_of_video_s FROM recipe WHERE id=?`, newRecipe, body.new_name ?? (src.name + ' (bản sao)'), src.recipe_id);
     run(`INSERT INTO playlist (id,channel_id,name,youtube_playlist_id,enabled,recipe_id,recipe_override,subtitle_style,
-          preferred_frequency,thumbnail_mode,thumbnail_extract_offset_s,episode_numbering,caption_delay_hours,privacy,dedupe_scope)
+          preferred_frequency,thumbnail_mode,thumbnail_extract_offset_s,episode_numbering,caption_delay_hours,privacy,dedupe_scope,thumb_style_id,subtitle_style_id)
          SELECT ?,channel_id,?,NULL,0,?,recipe_override,subtitle_style,preferred_frequency,thumbnail_mode,
-           thumbnail_extract_offset_s,episode_numbering,caption_delay_hours,privacy,dedupe_scope FROM playlist WHERE id=?`,
+           thumbnail_extract_offset_s,episode_numbering,caption_delay_hours,privacy,dedupe_scope,thumb_style_id,subtitle_style_id FROM playlist WHERE id=?`,
       nid, body.new_name ?? (src.name + ' (bản sao)'), newRecipe, p.id);
     // 05/10: bản sao có kho SEO MỚI, TRỐNG (anh Vũ chốt) — thư mục cạnh thư mục kho gốc: seo-<mã playlist mới>
     const srcTp = src.text_pool_id ? get('SELECT * FROM text_pool WHERE id=?', src.text_pool_id) : null;
@@ -456,6 +460,7 @@ function blockIfBusy(ids, what) {
   const b = busyPlaylists(ids);
   if (b.length) throw new Error(`${what} đang có trong chuỗi chưa chạy xong (${b.join(', ')}) — huỷ/chờ chuỗi xong rồi lưu trữ`);
 }
+registerStyleRoutes(route, { blockIfBusy }); // 08/10: kiểu chữ + xoá hẳn
 route('POST', '/api/channel/:id/archive', p => {
   const ch = get('SELECT * FROM channel WHERE id=?', p.id); if (!ch) throw new Error('Không có kênh ' + p.id);
   const pls = all('SELECT id FROM playlist WHERE channel_id=? AND archived=0', p.id).map(r => r.id);
