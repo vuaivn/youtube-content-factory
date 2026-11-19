@@ -10,6 +10,7 @@ New-Item -ItemType Directory -Force -Path "$Root\logs" | Out-Null
 $LogFile = "$Root\logs\update.log"
 $Utf8 = New-Object System.Text.UTF8Encoding $false
 [Console]::OutputEncoding = $Utf8 # đọc đúng tiếng Việt từ output git
+$env:GIT_TERMINAL_PROMPT = '0'; $env:GCM_INTERACTIVE = 'never' # SYSTEM không có màn hình: lỗi ngay thay vì treo chờ đăng nhập
 function Log($m) { $l = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $m"; Write-Host $l; [IO.File]::AppendAllText($LogFile, $l + "`r`n", $Utf8) }
 
 $GitExe = (Get-Command git -ErrorAction SilentlyContinue).Source
