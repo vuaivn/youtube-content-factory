@@ -72,7 +72,7 @@
     const qSel = sel([['1080', '1080p'], ['720', '720p (nhanh hơn)']]);
     // ---------- phụ đề ----------
     const S = { font: sel(FONTS.map(f => [f, f]), 'Arial'), size: num(88, { min: '10', max: '220' }), color: color('#FFFFFF'), outlineColor: color('#000000'),
-      outline: num(5, { min: '0', max: '20', step: '0.5' }), shadow: num(2, { min: '0', max: '10', step: '0.5' }), box: el('input', { type: 'checkbox', checked: true }), boxOpacity: num(0.65, { min: '0', max: '1', step: '0.05' }),
+      outline: num(5, { min: '0', max: '20', step: '0.5' }), shadow: num(2, { min: '0', max: '10', step: '0.5' }), box: el('input', { type: 'checkbox', checked: false }), boxOpacity: num(0.65, { min: '0', max: '1', step: '0.05' }),
       position: sel([['bottom', 'Dưới'], ['middle', 'Giữa'], ['top', 'Trên']]), marginV: num(70, { min: '0', max: '1000' }), bold: el('input', { type: 'checkbox', checked: true }) };
     const getStyle = () => ({ font: S.font.value, size: Number(S.size.value), color: S.color.value.toUpperCase(), outlineColor: S.outlineColor.value.toUpperCase(),
       outline: Number(S.outline.value), shadow: Number(S.shadow.value), box: S.box.checked, boxOpacity: Number(S.boxOpacity.value), position: S.position.value, marginV: Number(S.marginV.value), bold: S.bold.checked });

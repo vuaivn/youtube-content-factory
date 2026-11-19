@@ -1,5 +1,10 @@
 # Nhật ký thay đổi
 
+## 1.1.1 (19/11/2026)
+- **Giữ màu chữ nổi bật từ file .srt** (`<font color>`, đậm/nghiêng/gạch chân) khi ghép video.
+- **Phụ đề dễ đọc hơn**: mặc định chữ đậm, cỡ lớn, viền dày, có bóng; **tùy chọn nền mờ** phía sau chữ.
+- Sửa test slideshow (chạy không cần tham số, tự tạo ảnh thử).
+
 ## 1.1.0 (19/11/2026)
 - Trang mới **🎬 Video ghép tay**: chọn giọng đọc từ **kho voice nhiều tầng thư mục** (Thầy → Kinh → bài), sắp thứ tự tuỳ ý, khoảng lặng giữa các bài; nền từ **kho ảnh nhiều tầng** (chọn 1 thư mục, giây/ảnh, ngẫu nhiên/theo tên).
 - Slideshow ảnh **chuyển mờ + zoom mượt** (không rung, không cắt thẳng).

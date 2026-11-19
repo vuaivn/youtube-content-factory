@@ -14,8 +14,8 @@ export const aspectSize = (a, q = '1080') => { const s = ASPECTS[a]; const k = Q
 export const scaleSub = (st, k) => k === 1 ? st : { ...st, size: Math.max(10, Math.round(st.size * k)), outline: Math.round(st.outline * k * 10) / 10, shadow: Math.round((st.shadow ?? 0) * k * 10) / 10, marginV: Math.round(st.marginV * k) };
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 const POS = { bottom: 2, middle: 5, top: 8 };
-// Mặc định 11/2026: chữ đậm + hộp nền mờ (B) - đọc rõ trên ảnh rối; box:false = kiểu A (viền dày + bóng).
-export const DEFAULT_SUB = { font: 'Arial', size: 88, color: '#FFFFFF', outlineColor: '#000000', outline: 5, shadow: 2, box: true, boxOpacity: 0.65, position: 'bottom', marginV: 70, bold: true };
+// Mặc định 11/2026: kiểu A - chữ đậm, viền dày + bóng, không nền; box:true = hộp nền mờ (tùy chọn).
+export const DEFAULT_SUB = { font: 'Arial', size: 88, color: '#FFFFFF', outlineColor: '#000000', outline: 5, shadow: 2, box: false, boxOpacity: 0.65, position: 'bottom', marginV: 70, bold: true };
 
 export function validateManualSub(p = {}) {
   const s = { ...DEFAULT_SUB, ...p };
