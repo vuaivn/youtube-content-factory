@@ -34,7 +34,7 @@ function Healthy([int]$sec = 60) {
   if ($env:YCF_UPDATE_FORCE_FAIL -eq '1' -or (Test-Path "$Root\logs\force-update-fail.flag")) { Log 'TEST: ép health-check thất bại'; Start-Sleep 3; return $false }
   $t = (Get-Date).AddSeconds($sec)
   while ((Get-Date) -lt $t) {
-    try { $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 5 "http://127.0.0.1:$Port/api/update/check"; if ($r.StatusCode -eq 200) { return $true } } catch {}
+    try { $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 5 "http://127.0.0.1:$Port/api/update/check"; if ($r.StatusCode -eq 200) { $want = (G rev-parse --short HEAD); $got = ($r.Content | ConvertFrom-Json).head; if (-not $got -or $got -eq $want) { return $true } } # đúng bản code vừa checkout, không nhận nhầm server cũ } catch {}
     Start-Sleep 2
   }
   return $false
