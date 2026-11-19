@@ -223,7 +223,7 @@ export function startSupervisor() {
 export function saveSchedule(body, id = null) {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(body.time_vn ?? '')) throw new Error('Giờ hẹn phải dạng HH:MM (giờ Việt Nam)');
   if (!Array.isArray(body.playlist_ids) || !body.playlist_ids.length) throw new Error('Chưa chọn playlist');
-  for (const p of body.playlist_ids) if (!get('SELECT 1 FROM playlist WHERE id=?', p)) throw new Error('Không có playlist ' + p);
+  for (const p of body.playlist_ids) if (String(p).startsWith('manual--') || !get('SELECT 1 FROM playlist WHERE id=?', p)) throw new Error('Không có playlist ' + p);
   const name = (body.name || `Lịch ${body.time_vn}`).trim();
   // Tạo mới lúc đã quá giờ hôm nay thì KHÔNG chạy bù hôm nay (tránh chạy ngay khi vừa bấm lưu) — chạy từ ngày mai.
   const lastRun = !id && vnTime() >= body.time_vn ? vnDate() : undefined;

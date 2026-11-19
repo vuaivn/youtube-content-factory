@@ -494,6 +494,7 @@ route('POST', '/api/playlist/:id/archive', p => {
 });
 route('POST', '/api/playlist/:id/restore', p => {
   const pl = get('SELECT * FROM playlist WHERE id=?', p.id); if (!pl) throw new Error('Không có playlist ' + p.id);
+  if (pl.id.startsWith('manual--')) throw new Error('Playlist giữ chỗ video thủ công - không khôi phục');
   if (get('SELECT archived FROM channel WHERE id=?', pl.channel_id)?.archived) throw new Error('Kênh của playlist đang lưu trữ — khôi phục kênh trước');
   run('UPDATE playlist SET archived=0, archived_with_channel=0, archived_at=NULL WHERE id=?', p.id);
   return { restored: true };
@@ -516,7 +517,7 @@ route('GET', '/api/archive', () => ({
   channels: all(`SELECT c.*, (SELECT COUNT(*) FROM playlist p WHERE p.channel_id=c.id AND p.archived_with_channel=1) AS playlist_count
     FROM channel c WHERE c.archived=1 ORDER BY c.archived_at DESC`),
   playlists: all(`SELECT p.*, c.name AS channel_name, c.archived AS channel_archived FROM playlist p JOIN channel c ON c.id=p.channel_id
-    WHERE p.archived=1 AND p.archived_with_channel=0 ORDER BY p.archived_at DESC`),
+    WHERE p.archived=1 AND p.archived_with_channel=0 AND p.id NOT LIKE 'manual--%' ORDER BY p.archived_at DESC`),
   pools: all(`SELECT ap.*, (SELECT COUNT(*) FROM asset a WHERE a.pool_id=ap.id AND a.status='active') AS asset_count
     FROM asset_pool ap WHERE ap.archived=1 ORDER BY ap.archived_at DESC`),
   assets: all(`SELECT a.id, a.title, a.file_path, a.status, a.updated_at, ap.name AS pool_name, ap.kind
@@ -632,7 +633,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, fs.readFileSync(fp), MIME[path.extname(fp).toLowerCase()] ?? 'application/octet-stream');
     return send(res, 404, { error: 'not found: ' + u.pathname });
   } catch (e) {
-    return send(res, 400, { error: String(e.message) });
+    return send(res, e.status ?? 400, { error: String(e.message) });
   }
 });
 // Phòng thủ 2 lớp: bind HẸP đúng loopback + IP Tailscale (không 0.0.0.0), firewall là lớp phụ.

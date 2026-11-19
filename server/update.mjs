@@ -3,6 +3,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { get } from './db/db.mjs';
+
+/** Đang có video dựng/upload (chuỗi chạy) → không cho cập nhật (cập nhật sẽ tắt server giữa chừng). */
+export const busyJobs = () => get("SELECT COUNT(*) AS n FROM chain_item WHERE status='running'")?.n ?? 0;
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RAW = 'https://raw.githubusercontent.com/vuaivn/youtube-content-factory/main/';
@@ -42,9 +46,10 @@ export function registerUpdateRoutes(route, logDir) {
     const c = await refresh(q?.get('force') === '1');
     const current = localVersion();
     return { current, head: headHash(), latest: c.latest, hasUpdate: !!c.latest && cmpSemver(c.latest, current) > 0,
-      changelog: c.changelog, checkedAt: new Date(c.at).toISOString(), error: c.error };
+      changelog: c.changelog, busy: busyJobs() > 0, checkedAt: new Date(c.at).toISOString(), error: c.error };
   });
   route('POST', '/api/update/run', () => {
+    if (busyJobs() > 0) { const e = new Error('Đang dựng video, cập nhật sau'); e.status = 409; throw e; }
     const bat = path.join(ROOT, 'cap-nhat.bat');
     if (!fs.existsSync(bat)) throw new Error('Không thấy cap-nhat.bat');
     const child = spawn('cmd.exe', ['/c', bat, '--auto'], { cwd: ROOT, detached: true, windowsHide: true, stdio: 'ignore' });

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { buildManualPlan, writeManualSrt, buildVoiceTrack, ffmpegPath, ffprobePath, probeDuration } from '../recipe/manual-plan.mjs';
-import { aspectSize, srtToAss, buildAss, validateManualSub } from '../recipe/manual-style.mjs';
+import { aspectSize, srtToAss, buildAss, validateManualSub, scaleSub } from '../recipe/manual-style.mjs';
 import { renderSlideshow, listImages } from './slideshow.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -18,8 +18,8 @@ const ffEsc = p => p.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'
  */
 export function renderManual(o) {
   const log = o.log ?? (() => {});
-  const { width: W, height: H } = aspectSize(o.aspect ?? 'horizontal');
-  const style = validateManualSub(o.subStyle);
+  const { width: W, height: H, scale } = aspectSize(o.aspect ?? 'horizontal', o.quality ?? '1080');
+  const style = scaleSub(validateManualSub(o.subStyle), scale);
   fs.mkdirSync(o.workDir, { recursive: true }); fs.mkdirSync(o.outDir, { recursive: true });
   const timing = {}; let t0 = Date.now();
   const plan = buildManualPlan({ voiceIds: o.voiceIds, files: o.voiceFiles, gap: o.gap ?? 0.5 });
@@ -70,9 +70,9 @@ export function renderManual(o) {
 }
 
 /** 1 khung PNG xem thử phụ đề trên ảnh thật. Trả Buffer PNG. */
-export function previewFrame({ style, aspect, imageDir, image, sampleText, workDir }) {
-  const { width: W, height: H } = aspectSize(aspect ?? 'horizontal');
-  validateManualSub(style);
+export function previewFrame({ style, aspect, quality, imageDir, image, sampleText, workDir }) {
+  const { width: W, height: H, scale } = aspectSize(aspect ?? 'horizontal', quality ?? '1080');
+  style = scaleSub(validateManualSub(style), scale);
   const img = image ?? (imageDir ? listImages(imageDir)[0] : null);
   const dir = path.join(workDir, 'preview'); fs.mkdirSync(dir, { recursive: true });
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);

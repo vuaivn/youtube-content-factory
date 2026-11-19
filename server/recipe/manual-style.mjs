@@ -8,7 +8,10 @@ import { SUB_FONTS } from './styles.mjs';
 import { parseSrt } from '../execute/subtitle.mjs';
 
 export const ASPECTS = { vertical: [1080, 1920], horizontal: [1920, 1080], square: [1080, 1080] };
-export const aspectSize = a => { const s = ASPECTS[a]; if (!s) throw new Error('Khung hình không hợp lệ: ' + a + ' (vertical|horizontal|square)'); return { width: s[0], height: s[1] }; };
+export const QUALITY = { '1080': 1, '720': 2 / 3 };
+export const aspectSize = (a, q = '1080') => { const s = ASPECTS[a]; const k = QUALITY[String(q)]; if (!k) throw new Error('Chất lượng: 1080|720'); if (!s) throw new Error('Khung hình không hợp lệ: ' + a + ' (vertical|horizontal|square)'); return { width: Math.round(s[0] * k / 2) * 2, height: Math.round(s[1] * k / 2) * 2, scale: k }; };
+/** Co kiểu phụ đề theo chất lượng (cỡ/viền/lề nhập theo khung 1080) để nhìn y hệt. */
+export const scaleSub = (st, k) => k === 1 ? st : { ...st, size: Math.max(10, Math.round(st.size * k)), outline: Math.round(st.outline * k * 10) / 10, marginV: Math.round(st.marginV * k) };
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 const POS = { bottom: 2, middle: 5, top: 8 };
 export const DEFAULT_SUB = { font: 'Arial', size: 64, color: '#FFFFFF', outlineColor: '#000000', outline: 3, box: false, boxOpacity: 0.5, position: 'bottom', marginV: 120, bold: false };

@@ -20,6 +20,7 @@
     const log = el('pre', { style: 'max-height:220px;overflow:auto;font-size:12px;white-space:pre-wrap;display:none' });
     const status = el('div', { style: 'margin:8px 0' });
     const btn = el('button', { class: 'btn primary', onclick: () => run(btn, status, log) }, 'Cập nhật');
+    if (info.busy) status.replaceChildren(el('span', { class: 'badge warn' }, 'Đang dựng video, cập nhật sau'));
     modal(
       el('h3', {}, `Bản mới v${info.latest} (đang dùng v${info.current})`),
       el('pre', { style: 'max-height:320px;overflow:auto;white-space:pre-wrap;font-size:12.5px' }, info.changelog || '(không có ghi chú)'),
@@ -34,7 +35,10 @@
     btn.disabled = true;
     const before = info.head;
     status.textContent = 'Đang cập nhật…';
-    try { await fetch('/api/update/run', { method: 'POST' }); } catch { /* server tắt ngay sau khi trả lời */ }
+    try {
+      const rr = await fetch('/api/update/run', { method: 'POST' });
+      if (rr.status === 409 || rr.status === 400) { const j = await rr.json().catch(() => ({})); return fail(status, log, btn, j.error || 'Đang dựng video, cập nhật sau'); }
+    } catch { /* server tắt ngay sau khi trả lời */ }
     const t0 = Date.now();
     await new Promise(r => setTimeout(r, 4000));
     while (Date.now() - t0 < 120_000) {

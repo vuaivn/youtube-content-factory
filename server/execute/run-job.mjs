@@ -58,7 +58,7 @@ async function runManual(job, pl, ch) {
   jobId = job.id;
   const m = JSON.parse(job.meta_json);
   const upload = m.autoUpload && !noUpload;
-  log(`===== VIDEO THỦ CÔNG job #${job.id} · ${ch.name} · ${m.aspect} · ${m.voiceIds.length} file giọng · tự upload: ${upload ? 'có' : 'không'} =====`);
+  log(`===== VIDEO THỦ CÔNG job #${job.id} · ${ch.name} · ${m.aspect} ${m.quality ?? '1080'}p · ${m.voiceIds.length} file giọng · tự upload: ${upload ? 'có' : 'không'} =====`);
   if (upload) { stage('Kiểm đăng nhập kênh'); await checkLogin(ch); }
   outDir = path.join(OUT_ROOT, `${pl.id}-job${job.id}`); // file tạm (dọn khi xong)
   const keep = manualOutDir(job.id);                       // thành phẩm (GIỮ để xem thử)
@@ -66,7 +66,7 @@ async function runManual(job, pl, ch) {
   stage('Dựng video');
   const t0 = Date.now();
   const res = renderManual({ voiceIds: m.voiceIds, gap: m.gap, images: m.backgroundVideo ? null : imagesOf(m.imagePoolId, m.imageFolder),
-    backgroundVideo: m.backgroundVideo, secPerImage: m.secPerImage, order: m.order, aspect: m.aspect, subStyle: m.subStyle,
+    backgroundVideo: m.backgroundVideo, secPerImage: m.secPerImage, order: m.order, aspect: m.aspect, quality: m.quality ?? '1080', subStyle: m.subStyle,
     workDir: outDir, outDir: keep, log });
   const result = { video: res.video, srt: res.srt, thumb: res.thumb, duration_s: res.duration_s, width: res.width, height: res.height,
     timing: res.timing, render_s: (Date.now() - t0) / 1000, timeline: res.plan.timeline.map(s => ({ id: s.source.id, start_s: s.start_s, dur_s: s.dur_s })) };

@@ -105,6 +105,14 @@ Làm theo đúng thứ tự:
 
 Mỗi video: dựng → kiểm tra (thời lượng, fade, phụ đề) → upload **Riêng tư** → hẹn đăng phụ đề sau 6 giờ → dọn file tạm → sang kênh sau. Chỉ một kênh chạy một lúc.
 
+### B6b. Video ghép tay (từ v1.1.0)
+
+1. **Kho tài nguyên → + Tạo kho** loại **voice** (giọng đọc) và loại **image** (ảnh nền), trỏ tới thư mục gốc → *Quét lại*.
+2. Thư mục được chia **nhiều tầng** tuỳ ý, app hiện đúng cây đó. Ví dụ kho voice: `D:\Voice\Thầy A\Kinh Pháp Cú\bai-01.mp3`; kho ảnh: `D:\Anh\Chùa\...`, `D:\Anh\Phong cảnh\...`.
+3. Mỗi file `.mp3` cần file **`.srt` cùng tên, cùng thư mục** (`bai-01.mp3` + `bai-01.srt`) để có phụ đề; thiếu `.srt` thì đoạn đó không có phụ đề (web báo đỏ "thiếu .srt").
+4. Trang **🎬 Video ghép tay**: chọn kênh → tick các file giọng (sắp thứ tự bằng ↑ ↓) → bấm chọn 1 thư mục ảnh → khung Ngang/Dọc/Vuông, 1080p/720p → chỉnh phụ đề, *Xem trước khung hình* → nhập tiêu đề/mô tả/tags → **Dựng video** (xem thử rồi bấm *Đăng lên YouTube*) hoặc **Dựng & đăng**.
+5. Đang dựng video thì nút **Cập nhật** bị chặn ("Đang dựng video, cập nhật sau").
+
 ---
 
 ### B7. Mở giao diện từ xa (tuỳ chọn)
