@@ -28,3 +28,11 @@ docs/*.png
 test/*.png
 
 test/_*
+
+# backup / file rieng may / log cap nhat
+*-backup-*/
+backups/
+subst.txt
+start-system.bat
+*.cu
+update.log

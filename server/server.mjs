@@ -18,6 +18,7 @@ import { syncTextPool } from './recipe/seo-sync.mjs';
 import { startSupervisor, createChain, getChain, listChains, pauseChain, resumeChain, cancelChain, saveSchedule } from './execute/queue.mjs';
 import { LOG_DIR, vnFromSql, vnStamp } from './execute/notify.mjs';
 import { startAuth, finishAuth, checkAllTokens } from './execute/oauth.mjs';
+import { registerUpdateRoutes } from './update.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(HERE, '..', 'public');
@@ -68,6 +69,7 @@ function route(method, pattern, handler) {
   const re = new RegExp('^' + pattern.replace(/:[^/]+/g, m => { names.push(m.slice(1)); return '([^/]+)'; }) + '$');
   routes.push({ method, re, names, handler });
 }
+registerUpdateRoutes(route); // 18/11: tự cập nhật 1 nút
 
 // ===== Công thức theo playlist (B2, 30/09): form nhập PHÚT ↔ recipe lưu GIÂY =====
 // Mỗi playlist sở hữu MỘT recipe riêng (không dùng chung — sửa playlist này không ảnh hưởng playlist khác).

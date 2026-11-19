@@ -105,6 +105,12 @@ node test\test-executor.mjs    (logic dựng — không cần dữ liệu)
 ```
 Sau khi đã có kho + playlist: bấm **Lập kế hoạch** ở trang Sản xuất, rồi chạy chuỗi 1 playlist để dựng thật.
 
+### Cập nhật
+
+- **Cách 1 (nút bấm):** khi có bản mới, menu trái hiện **🔔 Có bản mới vX** → bấm xem nội dung → **Cập nhật**. App tự tắt, tải code mới (chỉ fast-forward), sao lưu `data\`, `secrets\`, `config.json` vào `backups\<ngày-giờ>\` (giữ 5 bản gần nhất) rồi bật lại (~30 giây). Nếu bản mới không chạy được, tự quay về bản cũ (ROLLBACK).
+- **Cách 2 (bằng tay):** bấm đúp `cap-nhat.bat` trong thư mục app.
+- Nhật ký: `logs\update.log`. Không cập nhật nếu có file code đã bị sửa tay trong repo.
+
 ---
 
 ## 9. Lỗi thường gặp
