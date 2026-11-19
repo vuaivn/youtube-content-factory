@@ -71,11 +71,11 @@
     const aspSel = sel([['horizontal', 'Ngang 16:9'], ['vertical', 'Dọc 9:16'], ['square', 'Vuông 1:1']]);
     const qSel = sel([['1080', '1080p'], ['720', '720p (nhanh hơn)']]);
     // ---------- phụ đề ----------
-    const S = { font: sel(FONTS.map(f => [f, f]), 'Arial'), size: num(80, { min: '10', max: '220' }), color: color('#FFFFFF'), outlineColor: color('#000000'),
-      outline: num(3, { min: '0', max: '20', step: '0.5' }), box: el('input', { type: 'checkbox' }), boxOpacity: num(0.5, { min: '0', max: '1', step: '0.05' }),
-      position: sel([['bottom', 'Dưới'], ['middle', 'Giữa'], ['top', 'Trên']]), marginV: num(120, { min: '0', max: '1000' }), bold: el('input', { type: 'checkbox' }) };
+    const S = { font: sel(FONTS.map(f => [f, f]), 'Arial'), size: num(88, { min: '10', max: '220' }), color: color('#FFFFFF'), outlineColor: color('#000000'),
+      outline: num(5, { min: '0', max: '20', step: '0.5' }), shadow: num(2, { min: '0', max: '10', step: '0.5' }), box: el('input', { type: 'checkbox', checked: true }), boxOpacity: num(0.65, { min: '0', max: '1', step: '0.05' }),
+      position: sel([['bottom', 'Dưới'], ['middle', 'Giữa'], ['top', 'Trên']]), marginV: num(70, { min: '0', max: '1000' }), bold: el('input', { type: 'checkbox', checked: true }) };
     const getStyle = () => ({ font: S.font.value, size: Number(S.size.value), color: S.color.value.toUpperCase(), outlineColor: S.outlineColor.value.toUpperCase(),
-      outline: Number(S.outline.value), box: S.box.checked, boxOpacity: Number(S.boxOpacity.value), position: S.position.value, marginV: Number(S.marginV.value), bold: S.bold.checked });
+      outline: Number(S.outline.value), shadow: Number(S.shadow.value), box: S.box.checked, boxOpacity: Number(S.boxOpacity.value), position: S.position.value, marginV: Number(S.marginV.value), bold: S.bold.checked });
     const setStyle = st => { for (const k of Object.keys(S)) if (st[k] != null) { if (S[k].type === 'checkbox') S[k].checked = !!st[k]; else S[k].value = st[k]; } };
     const presetSel = sel([['', '— mẫu đã lưu —'], ...presets.presets.map(p => [p.id, p.name])]);
     presetSel.onchange = () => { const p = presets.presets.find(x => x.id === presetSel.value); if (p) setStyle(p.style); };
@@ -150,7 +150,7 @@
       el('div', { class: 'card' }, el('h3', {}, '4. Phụ đề'),
         el('div', {}, lbl('Mẫu:', presetSel), el('button', { class: 'btn sm', onclick: savePreset }, '💾 Lưu kiểu')),
         el('div', {}, lbl('Font:', S.font), lbl('Cỡ chữ (khung 1080):', S.size), lbl('Đậm:', S.bold), lbl('Màu chữ:', S.color), lbl('Màu viền/nền:', S.outlineColor), lbl('Độ dày viền:', S.outline)),
-        el('div', {}, lbl('Nền mờ:', S.box), lbl('Độ đậm nền:', S.boxOpacity), lbl('Vị trí:', S.position), lbl('Lề dọc (px):', S.marginV)),
+        el('div', {}, lbl('Bóng:', S.shadow), lbl('Nền mờ:', S.box), lbl('Độ đậm nền:', S.boxOpacity), lbl('Vị trí:', S.position), lbl('Lề dọc (px):', S.marginV)),
         el('p', { class: 'mut' }, 'Chữ Hán dùng font MS Song. Cỡ/viền/lề nhập theo khung 1080 - chọn 720p tự co lại cho y hệt.'),
         el('button', { class: 'btn', onclick: preview }, '👁 Xem trước khung hình'), el('div', {}, pvImg)),
       el('div', { class: 'card' }, el('h3', {}, '5. Thông tin YouTube'),

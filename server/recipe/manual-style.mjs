@@ -11,10 +11,11 @@ export const ASPECTS = { vertical: [1080, 1920], horizontal: [1920, 1080], squar
 export const QUALITY = { '1080': 1, '720': 2 / 3 };
 export const aspectSize = (a, q = '1080') => { const s = ASPECTS[a]; const k = QUALITY[String(q)]; if (!k) throw new Error('Chất lượng: 1080|720'); if (!s) throw new Error('Khung hình không hợp lệ: ' + a + ' (vertical|horizontal|square)'); return { width: Math.round(s[0] * k / 2) * 2, height: Math.round(s[1] * k / 2) * 2, scale: k }; };
 /** Co kiểu phụ đề theo chất lượng (cỡ/viền/lề nhập theo khung 1080) để nhìn y hệt. */
-export const scaleSub = (st, k) => k === 1 ? st : { ...st, size: Math.max(10, Math.round(st.size * k)), outline: Math.round(st.outline * k * 10) / 10, marginV: Math.round(st.marginV * k) };
+export const scaleSub = (st, k) => k === 1 ? st : { ...st, size: Math.max(10, Math.round(st.size * k)), outline: Math.round(st.outline * k * 10) / 10, shadow: Math.round((st.shadow ?? 0) * k * 10) / 10, marginV: Math.round(st.marginV * k) };
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 const POS = { bottom: 2, middle: 5, top: 8 };
-export const DEFAULT_SUB = { font: 'Arial', size: 64, color: '#FFFFFF', outlineColor: '#000000', outline: 3, box: false, boxOpacity: 0.5, position: 'bottom', marginV: 120, bold: false };
+// Mặc định 11/2026: chữ đậm + hộp nền mờ (B) - đọc rõ trên ảnh rối; box:false = kiểu A (viền dày + bóng).
+export const DEFAULT_SUB = { font: 'Arial', size: 88, color: '#FFFFFF', outlineColor: '#000000', outline: 5, shadow: 2, box: true, boxOpacity: 0.65, position: 'bottom', marginV: 70, bold: true };
 
 export function validateManualSub(p = {}) {
   const s = { ...DEFAULT_SUB, ...p };
@@ -23,7 +24,7 @@ export function validateManualSub(p = {}) {
   if (!HEX.test(s.color) || !HEX.test(s.outlineColor)) throw new Error('Màu dạng #RRGGBB');
   if (!POS[s.position]) throw new Error('Vị trí: bottom|middle|top');
   return { font: s.font, size: Math.round(n(s.size, 10, 220, 'Cỡ chữ')), color: s.color.toUpperCase(), outlineColor: s.outlineColor.toUpperCase(),
-    outline: n(s.outline, 0, 20, 'Độ dày viền'), box: !!s.box, boxOpacity: n(s.boxOpacity, 0, 1, 'Độ đậm hộp'), position: s.position,
+    outline: n(s.outline, 0, 20, 'Độ dày viền'), shadow: n(s.shadow, 0, 10, 'Bóng'), box: !!s.box, boxOpacity: n(s.boxOpacity, 0, 1, 'Độ đậm hộp'), position: s.position,
     marginV: Math.round(n(s.marginV, 0, 1000, 'Khoảng cách dọc')), bold: !!s.bold };
 }
 
@@ -61,15 +62,31 @@ const assText = lines => lines.map(srtLineToAss).join('\\N');
 
 export function buildAss(cues, style, W, H) {
   const s = validateManualSub(style);
-  const boxA = 1 - s.boxOpacity; // ASS alpha: 0=đặc
-  const outC = s.box ? assColor(s.outlineColor, boxA) : assColor(s.outlineColor);
-  const back = s.box ? assColor(s.outlineColor, boxA) : '&H80000000';
   const mh = Math.round(W * 0.06);
+  const b = s.bold ? -1 : 0, al = POS[s.position];
+  const st = (name, prim, outC, back, bs, ol, sh) =>
+    `Style: ${name},${s.font},${s.size},${prim},&H000000FF,${outC},${back},${b},0,0,0,100,100,0,0,${bs},${ol},${sh},${al},${mh},${mh},${s.marginV},1\n`;
+  let styles, events;
+  if (s.box) {
+    // Hộp nền mờ: 2 lớp để KHÔNG có vệt tối giữa các đoạn màu khác nhau.
+    // Lớp 0 "Box": BorderStyle=3, chữ trong suốt, KHÔNG tag màu -> 1 hộp liền mỗi dòng (Outline = đệm hộp).
+    // Lớp 1 "Default": chữ màu (cam nổi bật giữ nguyên) + viền mảnh cùng màu viền, không hộp.
+    const boxC = assColor(s.outlineColor, 1 - s.boxOpacity); // ASS alpha: 0=đặc
+    const pad = Math.max(s.outline, Math.round(s.size * 0.14));
+    const thin = Math.round(Math.max(1.5, s.outline * 0.5) * 10) / 10;
+    styles = st('Box', '&HFF000000', boxC, boxC, 3, pad, 0) + st('Default', assColor(s.color), assColor(s.outlineColor), '&H00000000', 1, thin, 0);
+    const plain = t => t.replace(/\\1?c&H[0-9A-Fa-f]+&?|\\1?c(?=[\\}])/g, '').replace(/\{\}/g, '');
+    events = cues.map(c => { const t = assText(c.lines), a = assTime(c.start), e = assTime(c.end);
+      return `Dialogue: 0,${a},${e},Box,,0,0,0,,${plain(t)}\nDialogue: 1,${a},${e},Default,,0,0,0,,${t}`; });
+  } else {
+    // Kiểu A: chữ đậm + viền dày + bóng đen bán trong suốt.
+    styles = st('Default', assColor(s.color), assColor(s.outlineColor), '&H60000000', 1, s.outline, s.shadow);
+    events = cues.map(c => `Dialogue: 0,${assTime(c.start)},${assTime(c.end)},Default,,0,0,0,,${assText(c.lines)}`);
+  }
   const head = `[Script Info]\nScriptType: v4.00+\nPlayResX: ${W}\nPlayResY: ${H}\nWrapStyle: 0\nScaledBorderAndShadow: yes\nYCbCr Matrix: TV.709\n\n` +
     `[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n` +
-    `Style: Default,${s.font},${s.size},${assColor(s.color)},&H000000FF,${outC},${back},${s.bold ? -1 : 0},0,0,0,100,100,0,0,${s.box ? 3 : 1},${s.box ? Math.max(s.outline, 8) : s.outline},0,${POS[s.position]},${mh},${mh},${s.marginV},1\n\n` +
-    `[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
-  return '\uFEFF' + head + cues.map(c => `Dialogue: 0,${assTime(c.start)},${assTime(c.end)},Default,,0,0,0,,${assText(c.lines)}`).join('\n') + '\n';
+    styles + `\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
+  return '\uFEFF' + head + events.join('\n') + '\n';
 }
 export function srtToAss(srtPath, assPath, style, W, H) {
   fs.writeFileSync(assPath, buildAss(parseSrt(fs.readFileSync(srtPath, 'utf8')), style, W, H), 'utf8');
