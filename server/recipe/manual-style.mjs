@@ -31,7 +31,33 @@ const bgr = h => h.slice(5, 7) + h.slice(3, 5) + h.slice(1, 3);
 const assColor = (h, alpha = 0) => '&H' + Math.round(alpha * 255).toString(16).padStart(2, '0').toUpperCase() + bgr(h);
 const assTime = t => { t = Math.max(0, t); const cs = Math.round(t * 100); const h = Math.floor(cs / 360000), m = Math.floor(cs / 6000) % 60, s = Math.floor(cs / 100) % 60;
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs % 100).padStart(2, '0')}`; };
-const assText = lines => lines.map(l => l.replace(/[{}]/g, '').replace(/\\/g, '＼')).join('\\N');
+// Chuyển định dạng SRT -> ASS override: <font color="#RRGGBB"> -> {\c&HBBGGRR&}, </font> -> trả màu trước (stack),
+// <b>/<i>/<u>/<s> -> \b1.. ; giữ nguyên block {\...} có sẵn; bỏ tag lạ; '{' '}' rời bị bỏ, '\' rời -> '＼'.
+export function srtLineToAss(l) {
+  const out = []; const colors = [];
+  const re = /(\{\\[^}]*\})|<\s*(\/?)\s*([a-zA-Z]+)([^>]*)>|([\s\S])/g; let m; let txt = '';
+  const flush = () => { if (txt) { out.push(txt.replace(/[{}]/g, '').replace(/\\/g, '＼')); txt = ''; } };
+  while ((m = re.exec(l))) {
+    if (m[1]) { flush(); out.push(m[1]); continue; }
+    if (m[5] !== undefined) { txt += m[5]; continue; }
+    flush();
+    const close = !!m[2], tag = m[3].toLowerCase(), attr = m[4] || '';
+    if (tag === 'font') {
+      if (!close) {
+        const c = /color\s*=\s*["']?#?([0-9a-fA-F]{6})/i.exec(attr);
+        colors.push(c ? c[1].toUpperCase() : null);
+        if (c) out.push(`{\\c&H${bgr('#' + c[1].toUpperCase())}&}`);
+      } else if (colors.length) {
+        const was = colors.pop();
+        if (was) { const prev = [...colors].reverse().find(Boolean); out.push(prev ? `{\\c&H${bgr('#' + prev)}&}` : '{\\c}'); }
+      }
+    } else if (['b', 'i', 'u', 's'].includes(tag)) out.push(`{\\${tag}${close ? 0 : 1}}`);
+    // tag khác: bỏ
+  }
+  flush();
+  return out.join('');
+}
+const assText = lines => lines.map(srtLineToAss).join('\\N');
 
 export function buildAss(cues, style, W, H) {
   const s = validateManualSub(style);
