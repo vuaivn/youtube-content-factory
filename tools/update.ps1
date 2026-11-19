@@ -9,6 +9,7 @@ $Port = 18990
 New-Item -ItemType Directory -Force -Path "$Root\logs" | Out-Null
 $LogFile = "$Root\logs\update.log"
 $Utf8 = New-Object System.Text.UTF8Encoding $false
+[Console]::OutputEncoding = $Utf8 # đọc đúng tiếng Việt từ output git
 function Log($m) { $l = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $m"; Write-Host $l; [IO.File]::AppendAllText($LogFile, $l + "`r`n", $Utf8) }
 
 $GitExe = (Get-Command git -ErrorAction SilentlyContinue).Source
