@@ -10,6 +10,10 @@ export function migrateManual() {
   const cols = all('PRAGMA table_info(job)').map(c => c.name);
   if (!cols.includes('kind')) run("ALTER TABLE job ADD COLUMN kind TEXT NOT NULL DEFAULT 'recipe'");
   if (!cols.includes('meta_json')) run('ALTER TABLE job ADD COLUMN meta_json TEXT');
+  // recipe riêng (không dùng để dựng) cho playlist giữ chỗ — không mượn recipe thật (chặn xoá recipe đó)
+  if (!get("SELECT 1 FROM recipe WHERE id='manual'"))
+    run(`INSERT INTO recipe (id, name, kind, body_spec, tail_spec) VALUES ('manual', '[Video thủ công - giữ chỗ]', 'manual', '{}', '[]')`);
+  run("UPDATE playlist SET recipe_id='manual' WHERE id LIKE 'manual--%' AND recipe_id<>'manual'");
 }
 
 // Tạo (nếu chưa có) playlist giữ chỗ cho kênh. recipe_id NOT NULL → mượn recipe đầu tiên (không dùng tới).
@@ -18,10 +22,8 @@ export function ensureManualPlaylist(channelId) {
   if (!ch) throw new Error('Không có kênh ' + channelId);
   const id = manualPlaylistId(channelId);
   if (!get('SELECT 1 FROM playlist WHERE id=?', id)) {
-    const rc = get('SELECT id FROM recipe ORDER BY id LIMIT 1');
-    if (!rc) throw new Error('Chưa có recipe nào - không tạo được playlist giữ chỗ');
     run(`INSERT INTO playlist (id, channel_id, name, enabled, recipe_id, archived, archived_at)
-      VALUES (?, ?, '[Video thủ công]', 0, ?, 1, datetime('now'))`, id, channelId, rc.id);
+      VALUES (?, ?, '[Video thủ công]', 0, 'manual', 1, datetime('now'))`, id, channelId);
   }
   return id;
 }
