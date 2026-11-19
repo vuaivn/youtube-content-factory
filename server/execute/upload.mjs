@@ -213,9 +213,9 @@ export function makeThumbnail({ plan, offsetS, texts, outPath, ffmpeg }) {
 }
 
 // Upload thật: thử lại tối đa `retries` lần khi KHÔNG nhận được videoId (không upload trùng khi đã có id).
-export async function uploadVideo({ secretsFile, file, title, descFile, tags, privacy, thumb, youtubePlaylist, retries = 3, log = () => {} }) {
+export async function uploadVideo({ secretsFile, file, title, descFile, tags, privacy, thumb, youtubePlaylist, publishAt = null, retries = 3, log = () => {} }) {
   const args = [UPLOAD_API, '--file', file, '--title', title, '--desc-file', descFile, '--privacy', privacy || 'private',
-    ...(tags?.length ? ['--tags', tags.join(',')] : []), ...(thumb ? ['--thumb', thumb] : []), ...(youtubePlaylist ? ['--playlist', youtubePlaylist] : [])];
+    ...(tags?.length ? ['--tags', tags.join(',')] : []), ...(thumb ? ['--thumb', thumb] : []), ...(youtubePlaylist ? ['--playlist', youtubePlaylist] : []), ...(publishAt ? ['--publishAt', publishAt] : [])];
   let lastErr;
   for (let attempt = 1; attempt <= retries + 1; attempt++) {
     log(`Upload lần ${attempt}/${retries + 1}…`);
@@ -232,7 +232,8 @@ export async function uploadVideo({ secretsFile, file, title, descFile, tags, pr
 }
 
 // Hẹn phụ đề: .srt giữ ở captions/<videoId>/, task SYSTEM chạy bù khi máy tắt đúng giờ.
-export function scheduleCaption({ videoId, srtSrc, secretsFile, delayHours = 6, log = () => {} }) {
+export function scheduleCaption({ videoId, srtSrc, secretsFile, delayHours = 6, lang = 'vi', log = () => {} }) {
+  if (!/^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})?$/.test(lang)) throw new Error('Mã ngôn ngữ phụ đề không hợp lệ: ' + lang);
   const dir = path.join(CAPTION_DIR, videoId);
   fs.mkdirSync(dir, { recursive: true });
   const capSrt = path.join(dir, `${videoId}.srt`);
@@ -244,7 +245,7 @@ export function scheduleCaption({ videoId, srtSrc, secretsFile, delayHours = 6, 
     `@echo off\r\n` +
     `set "YTP_SECRETS_FILE=${secretsFile}"\r\n` +
     `echo [%date% %time%] === Bat dau upload phu de cho video ${videoId} === >> "${capLog}"\r\n` +
-    `"${process.execPath}" "${CAPTION_API}" --video ${videoId} --srt "${capSrt}" --lang vi >> "${capLog}" 2>&1\r\n` +
+    `"${process.execPath}" "${CAPTION_API}" --video ${videoId} --srt "${capSrt}" --lang ${lang} >> "${capLog}" 2>&1\r\n` +
     `if %ERRORLEVEL%==0 ( echo [%date% %time%] KET QUA: THANH CONG >> "${capLog}" ) else ( echo [%date% %time%] KET QUA: THAT BAI exitcode=%ERRORLEVEL% - giu file .srt de xu ly tay >> "${capLog}" )\r\n` +
     `schtasks /Delete /TN "${taskName}" /F >nul 2>&1\r\n`);
   const pad = x => String(x).padStart(2, '0');

@@ -16,6 +16,8 @@ import { verifyVideo } from './verify.mjs';
 import { recordUsage } from './usage.mjs';
 import { pickTexts, markTextsUsed, makeThumbnail, uploadVideo, scheduleCaption } from './upload.mjs';
 import { appendLog } from './notify.mjs';
+import { renderManual } from './manual-render.mjs';
+import { imagesOf, manualOutDir } from '../recipe/manual-plan.mjs';
 
 export const OUT_ROOT = config.workDir; // config.json → workDir
 const arg = n => { const i = process.argv.indexOf('--' + n); return i >= 0 ? process.argv[i + 1] : null; };
@@ -39,8 +41,58 @@ function cleanup() {
   }
 }
 
+// ===== VIDEO THỦ CÔNG (11/2026): không lập kế hoạch recipe / chọn SEO — anh chọn sẵn giọng, ảnh, tiêu đề =====
+async function checkLogin(ch) {
+  if (!ch.secrets_file || !fs.existsSync(ch.secrets_file)) throw new Error('Kênh thiếu file đăng nhập: ' + ch.secrets_file);
+  const sc = JSON.parse(fs.readFileSync(ch.secrets_file, 'utf8').replace(/^\uFEFF/, ''));
+  const tr = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', body: new URLSearchParams({
+    client_id: sc.client_id || sc.YT_CLIENT_ID, client_secret: sc.client_secret || sc.YT_CLIENT_SECRET,
+    refresh_token: sc.refresh_token || sc.YT_REFRESH_TOKEN, grant_type: 'refresh_token' }) }).then(r => r.json()).catch(e => ({ error: e.message }));
+  if (!tr.access_token) {
+    run("UPDATE channel SET token_status='expired', token_checked_at=datetime('now') WHERE id=?", ch.id);
+    throw new Error(`Mã đăng nhập YouTube của kênh ${ch.name} đã hết hạn/bị thu hồi (${tr.error}) - KHÔNG dựng.`);
+  }
+  run("UPDATE channel SET token_status='valid', token_checked_at=datetime('now') WHERE id=?", ch.id);
+}
+async function runManual(job, pl, ch) {
+  jobId = job.id;
+  const m = JSON.parse(job.meta_json);
+  const upload = m.autoUpload && !noUpload;
+  log(`===== VIDEO THỦ CÔNG job #${job.id} · ${ch.name} · ${m.aspect} · ${m.voiceIds.length} file giọng · tự upload: ${upload ? 'có' : 'không'} =====`);
+  if (upload) { stage('Kiểm đăng nhập kênh'); await checkLogin(ch); }
+  outDir = path.join(OUT_ROOT, `${pl.id}-job${job.id}`); // file tạm (dọn khi xong)
+  const keep = manualOutDir(job.id);                       // thành phẩm (GIỮ để xem thử)
+  run("UPDATE job SET status='rendering', started_at=datetime('now') WHERE id=?", job.id);
+  stage('Dựng video');
+  const t0 = Date.now();
+  const res = renderManual({ voiceIds: m.voiceIds, gap: m.gap, images: m.backgroundVideo ? null : imagesOf(m.imagePoolId, m.imageFolder),
+    backgroundVideo: m.backgroundVideo, secPerImage: m.secPerImage, order: m.order, aspect: m.aspect, subStyle: m.subStyle,
+    workDir: outDir, outDir: keep, log });
+  const result = { video: res.video, srt: res.srt, thumb: res.thumb, duration_s: res.duration_s, width: res.width, height: res.height,
+    timing: res.timing, render_s: (Date.now() - t0) / 1000, timeline: res.plan.timeline.map(s => ({ id: s.source.id, start_s: s.start_s, dur_s: s.dur_s })) };
+  run("UPDATE job SET video_path=?, plan_json=? WHERE id=?", res.video, JSON.stringify(result), job.id);
+  log(`Dựng xong sau ${(result.render_s / 60).toFixed(1)} phút → ${res.video}`);
+  if (!upload) { run("UPDATE job SET status='done', finished_at=datetime('now') WHERE id=?", job.id); log('Không tự upload - thành phẩm giữ tại ' + keep); return { videoId: null }; }
+
+  stage('Upload YouTube');
+  run("UPDATE job SET status='uploading' WHERE id=?", job.id);
+  const descFile = path.join(keep, 'description.txt');
+  fs.writeFileSync(descFile, m.meta.description ?? '', 'utf8');
+  const up = await uploadVideo({ secretsFile: ch.secrets_file, file: res.video, title: m.meta.title, descFile, tags: m.meta.tags,
+    privacy: m.meta.privacy, thumb: res.thumb, youtubePlaylist: m.meta.youtubePlaylist, publishAt: m.meta.publishAt, log });
+  log(`Upload xong: https://youtu.be/${up.videoId} (lần ${up.attempt})`);
+  run("UPDATE job SET status='done', youtube_video_id=?, finished_at=datetime('now') WHERE id=?", up.videoId, job.id);
+  run('UPDATE chain_item SET youtube_video_id=? WHERE id=?', up.videoId, itemId);
+  stage('Hẹn đăng phụ đề');
+  try { scheduleCaption({ videoId: up.videoId, srtSrc: res.srt, secretsFile: ch.secrets_file, delayHours: pl.caption_delay_hours ?? 6, lang: m.captionLang || 'vi', log }); }
+  catch (e) { log('⚠ KHÔNG hẹn được phụ đề: ' + e.message); }
+  return { videoId: up.videoId };
+}
+
 async function main() {
   run("UPDATE chain_item SET pid=?, status='running', started_at=COALESCE(started_at, datetime('now')) WHERE id=?", process.pid, itemId);
+  const mj = item.job_id ? get("SELECT * FROM job WHERE id=? AND kind='manual'", item.job_id) : null;
+  if (mj) { const mpl = get('SELECT * FROM playlist WHERE id=?', item.playlist_id); return runManual(mj, mpl, get('SELECT * FROM channel WHERE id=?', mpl.channel_id)); }
   const pl = get('SELECT * FROM playlist WHERE id=?', item.playlist_id);
   const ch = get('SELECT * FROM channel WHERE id=?', pl.channel_id);
   log(`===== ${ch.name} · ${pl.name} (${pl.id}) =====`);

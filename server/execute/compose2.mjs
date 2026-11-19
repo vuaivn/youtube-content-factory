@@ -25,7 +25,10 @@ fs.mkdirSync(WORK, { recursive: true });
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 
 const ASPECT = spec.aspect || '16:9';
-const TARGET = ASPECT === '9:16' ? { w: 720, h: 1280 } : { w: 1280, h: 720 };
+// 11/2026 video thủ công: spec.width/height (chẵn) ghi đè; spec cũ không có → giữ mặc định cũ
+const TARGET = (Number(spec.width) > 0 && Number(spec.height) > 0)
+  ? { w: Math.round(spec.width / 2) * 2, h: Math.round(spec.height / 2) * 2 }
+  : ASPECT === '9:16' ? { w: 720, h: 1280 } : { w: 1280, h: 720 };
 const FPS = spec.fps || 30;
 const LUFS = spec.loudnorm_lufs ?? -16;
 // Bitrate: crf 22 cho file 6,6 Mbps o 720p — cao gap 2,6 lan muc YouTube can (2,5 Mbps).

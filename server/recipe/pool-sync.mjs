@@ -11,7 +11,9 @@ import { spawnSync } from 'node:child_process';
 import { get, all, run } from '../db/db.mjs';
 
 export const VOICE_KINDS = ['hook', 'story', 'outro']; // bắt buộc có .srt đi kèm
-const POOL_EXTS = { shot: ['.mp4', '.mov', '.webm'], music: ['.mp3', '.wav', '.flac', '.m4a', '.aac'], voice: ['.mp3', '.wav'] };
+const POOL_EXTS = { shot: ['.mp4', '.mov', '.webm'], music: ['.mp3', '.wav', '.flac', '.m4a', '.aac'], voice: ['.mp3', '.m4a', '.wav'], image: ['.jpg', '.jpeg', '.png', '.webp'] };
+// 11/2026 video thủ công: kho 'voice' (giọng + .srt cùng tên, cây thư mục) và 'image' (ảnh, không đo thời lượng)
+export const MANUAL_KINDS = ['voice', 'image'];
 export const poolExts = kind => POOL_EXTS[kind] ?? POOL_EXTS.voice;
 
 // Đo thời lượng (ffprobe) + md5 cho file MỚI nhập — plan.mjs cần duration_s > 0 mới chọn được.
@@ -24,6 +26,8 @@ export function probeFile(fp) {
   try { let n; while ((n = fs.readSync(fd, buf, 0, buf.length, null)) > 0) h.update(buf.subarray(0, n)); } finally { fs.closeSync(fd); }
   return { duration_s: Number.isFinite(dur) && dur > 0 ? dur : null, md5: h.digest('hex'), size: fs.statSync(fp).size };
 }
+
+function md5Of(fp) { return crypto.createHash('md5').update(fs.readFileSync(fp)).digest('hex'); }
 
 // Đánh dấu file mất / khôi phục file quay lại — KHÔNG đọc thư mục, chỉ kiểm từng đường dẫn (nhanh).
 export function markMissing(poolId) {
@@ -64,7 +68,8 @@ export function syncPool(poolId) {
     return { seen: 0, added: 0, rejected: [], ...m, warning: 'Thư mục kho không tồn tại: ' + pool.root_dir };
   }
   const exts = poolExts(pool.kind);
-  const needSub = VOICE_KINDS.includes(pool.kind);
+  const needSub = VOICE_KINDS.includes(pool.kind) || pool.kind === 'voice';
+  const isImage = pool.kind === 'image';
   let added = 0, seen = 0, retitled = 0; const rejected = [];
   (function walk(d) {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
@@ -87,11 +92,11 @@ export function syncPool(poolId) {
       {
         const hasSub = fs.existsSync(fp.replace(/\.[^.]+$/, '.srt')) || fs.existsSync(fp.replace(/\.[^.]+$/, '.ass'));
         if (needSub && !hasSub) { rejected.push(e.name); continue; } // thiếu phụ đề → từ chối
-        const pr = probeFile(fp);
-        if (!pr.duration_s) { rejected.push(e.name + ' (không đọc được thời lượng — file hỏng?)'); continue; }
+        const pr = isImage ? { duration_s: 0, md5: md5Of(fp) } : probeFile(fp);
+        if (!isImage && !pr.duration_s) { rejected.push(e.name + ' (không đọc được thời lượng — file hỏng?)'); continue; }
         const sc = readSidecar(fp);
         run('INSERT INTO asset (pool_id,file_path,title,has_subtitle,duration_s,md5,sidecar_json) VALUES (?,?,?,?,?,?,?)',
-          poolId, fp, sc.title || stemOf(fp), hasSub ? 1 : 0, pr.duration_s, pr.md5, sc.json);
+          poolId, fp, isImage ? stemOf(fp) : (sc.title || stemOf(fp)), hasSub ? 1 : 0, isImage ? null : pr.duration_s, pr.md5, isImage ? null : sc.json);
         added++;
       }
     }

@@ -14,6 +14,8 @@ import { migrateArchive } from './migrate/m4-archive.mjs';
 import { migrateSeo } from './migrate/m5-seo.mjs';
 import { migrateStyle } from './migrate/m6-style.mjs';
 import { registerStyleRoutes, syncSubtitleStyle } from './routes-style.mjs';
+import { migrateManual } from './migrate/m7-manual.mjs';
+import { registerManualRoutes, manualJobInfo } from './routes-manual.mjs';
 import { syncTextPool } from './recipe/seo-sync.mjs';
 import { startSupervisor, createChain, getChain, listChains, pauseChain, resumeChain, cancelChain, saveSchedule } from './execute/queue.mjs';
 import { LOG_DIR, vnFromSql, vnStamp } from './execute/notify.mjs';
@@ -32,6 +34,7 @@ const TAILSCALE_IP = Object.values(os.networkInterfaces()).flat()
 openDb();
 migrateArchive(); // 30/09: cột lưu trữ kênh/playlist/kho
 migrateStyle();   // 08/10: kiểu chữ thumbnail / phụ đề
+migrateManual();  // 11/2026: job video thủ công (job.kind, job.meta_json)
 migrateSeo();     // 02/10: kho SEO từ thư mục file
 
 // ---------- helpers ----------
@@ -285,7 +288,7 @@ route('GET', '/api/pool', () => all(`
   FROM asset_pool ap LEFT JOIN asset a ON a.pool_id=ap.id AND a.status='active'
   WHERE ap.archived=0
   GROUP BY ap.id ORDER BY ap.kind, ap.name`));
-const POOL_KINDS = ['hook', 'story', 'outro', 'shot', 'music'];
+const POOL_KINDS = ['hook', 'story', 'outro', 'shot', 'music', 'voice', 'image']; // voice/image: video thủ công (11/2026)
 // VOICE_KINDS / poolExts / probeFile chuyển sang recipe/pool-sync.mjs (30/09)
 route('POST', '/api/pool', (p, body) => {
   for (const k of ['id', 'kind', 'name', 'root_dir']) if (!body[k]) throw new Error('Thiếu ' + k);
@@ -462,7 +465,8 @@ function blockIfBusy(ids, what) {
   const b = busyPlaylists(ids);
   if (b.length) throw new Error(`${what} đang có trong chuỗi chưa chạy xong (${b.join(', ')}) — huỷ/chờ chuỗi xong rồi lưu trữ`);
 }
-registerStyleRoutes(route, { blockIfBusy }); // 08/10: kiểu chữ + xoá hẳn
+registerStyleRoutes(route, { blockIfBusy });
+registerManualRoutes(route); // 11/2026: video thủ công // 08/10: kiểu chữ + xoá hẳn
 route('POST', '/api/channel/:id/archive', p => {
   const ch = get('SELECT * FROM channel WHERE id=?', p.id); if (!ch) throw new Error('Không có kênh ' + p.id);
   const pls = all('SELECT id FROM playlist WHERE channel_id=? AND archived=0', p.id).map(r => r.id);
@@ -594,6 +598,21 @@ const server = http.createServer(async (req, res) => {
       if (!fs.existsSync(f)) return send(res, 404, { error: 'không có log' });
       res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'content-disposition': `attachment; filename="${path.basename(f)}"`, 'cache-control': 'no-store' });
       return res.end(fs.readFileSync(f));
+    }
+    const mv = req.method === 'GET' && u.pathname.match(/^\/api\/manual-job\/(\d+)\/(video|thumb)$/);
+    if (mv) { // xem thử thành phẩm video thủ công (hỗ trợ Range để tua)
+      const info = manualJobInfo(Number(mv[1]));
+      const f = mv[2] === 'video' ? info?.video_path : info?.result?.thumb;
+      if (!f || !fs.existsSync(f)) return send(res, 404, { error: 'chưa có file' });
+      const size = fs.statSync(f).size, type = mv[2] === 'video' ? 'video/mp4' : 'image/jpeg';
+      const rg = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
+      if (rg) {
+        const a = rg[1] ? Number(rg[1]) : 0, b = rg[2] ? Math.min(Number(rg[2]), size - 1) : size - 1;
+        res.writeHead(206, { 'content-type': type, 'accept-ranges': 'bytes', 'content-range': `bytes ${a}-${b}/${size}`, 'content-length': b - a + 1 });
+        return fs.createReadStream(f, { start: a, end: b }).pipe(res);
+      }
+      res.writeHead(200, { 'content-type': type, 'accept-ranges': 'bytes', 'content-length': size });
+      return fs.createReadStream(f).pipe(res);
     }
     const up = req.method === 'POST' && u.pathname.match(/^\/api\/pool\/([^/]+)\/upload$/);
     if (up) return send(res, 200, await handleUpload(decodeURIComponent(up[1]), req));

@@ -3,7 +3,7 @@
 const { get, all } = await import('../server/db/db.mjs');
 const { buildPlan } = await import('../server/recipe/plan.mjs');
 let pass = 0, fail = 0;
-for (const pl of all('SELECT * FROM playlist')) {
+for (const pl of all('SELECT * FROM playlist WHERE archived=0')) { // playlist lưu trữ / giữ chỗ video thủ công: bỏ qua
   const recipe = get('SELECT * FROM recipe WHERE id=?', pl.recipe_id);
   recipe.body_spec = JSON.parse(recipe.body_spec); recipe.tail_spec = JSON.parse(recipe.tail_spec);
   if (recipe.body_spec.stories !== 'fill') { console.log(`  bỏ qua ${pl.id} (không dùng fill)`); continue; }

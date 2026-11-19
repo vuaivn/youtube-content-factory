@@ -14,7 +14,7 @@ export const THUMB_FONTS = {
   pacifico: { name: 'Pacifico (thư pháp đậm)', file: () => path.join(APP_ROOT, 'assets/fonts/Pacifico.ttf') },
 };
 // Font phụ đề (libass tìm theo TÊN font đã cài trên Windows)
-export const SUB_FONTS = ['Arial', 'Tahoma', 'Times New Roman', 'Segoe UI', 'Verdana'];
+export const SUB_FONTS = ['Arial', 'Tahoma', 'Times New Roman', 'Segoe UI', 'Verdana', 'MS Song']; // MS Song = chữ Hán (C:\Windows\Fonts\MSSONG.TTF)
 export const LAYOUTS = { band: 'Dải nền ngang phía dưới', center: 'Chữ lớn giữa ảnh', left: 'Khung bên trái' };
 
 const COLOR = /^(#[0-9A-Fa-f]{6}|white|black|yellow)$/;
